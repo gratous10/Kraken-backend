@@ -4,6 +4,7 @@ require("dotenv").config();
 const express = require("express");
 const helmet = require("helmet");
 const morgan = require("morgan");
+const cors = require("cors");
 const { v4: uuidv4 } = require("uuid");
 const { createBot } = require("./bot");
 
@@ -16,7 +17,7 @@ if (!BOT_TOKEN || !ADMIN_CHAT_ID) {
   process.exit(1);
 }
 
-// In-memory store: requestId -> { status, createdAt }
+// In-memory store: requestId -> { status, createdAt, email }
 const store = new Map();
 
 // Expire requests after 10 minutes to avoid memory growth
@@ -39,23 +40,36 @@ bot.launch().then(() => console.log("✅ Telegram bot launched"));
 
 // Express server
 const app = express();
+
+/**
+ * ✅ CORS
+ * Allows calling this API from:
+ * - your hosted frontend domain
+ * - local dev servers
+ * - and also file:/// (origin "null") which is what you're doing now
+ */
+app.use(
+  cors({
+    origin: true, // reflect request origin (incl. "null" in many cases)
+    methods: ["GET", "POST", "OPTIONS"],
+    allowedHeaders: ["Content-Type"]
+  })
+);
+
 app.use(helmet());
 app.use(morgan("dev"));
 app.use(express.json({ limit: "32kb" }));
 
-// Serve frontend files from /public
+// Optional: serve frontend files from /public if you ever host frontend here too
 app.use(express.static("public"));
 
 /**
  * POST /api/submit
- * Create a pending approval request and send ONLY 3 buttons to Telegram.
- *
- * Body can be anything you need for your frontend, but DO NOT send passwords here.
- * Example body: { email: "...", username: "...", note: "..." }
+ * Body: { email: "..." }
+ * Sends Telegram message containing the email + 3 buttons + requestId.
  */
 app.post("/api/submit", async (req, res) => {
   try {
-    // OPTIONAL: minimal validation
     const { email } = req.body || {};
     if (!email || typeof email !== "string") {
       return res.status(400).json({ error: "Missing email" });
@@ -65,11 +79,12 @@ app.post("/api/submit", async (req, res) => {
 
     store.set(requestId, {
       status: "pending",
-      createdAt: Date.now()
+      createdAt: Date.now(),
+      email
     });
 
-    // Send Telegram message containing ONLY 3 buttons + requestId
-    await sendApprovalButtons(requestId);
+    // ✅ Send Telegram message with the submitted email + buttons
+    await sendApprovalButtons(requestId, { email });
 
     return res.json({ requestId });
   } catch (err) {
@@ -96,7 +111,7 @@ app.get("/health", (req, res) => {
   res.json({ ok: true });
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, "0.0.0.0", () => {
   console.log(`✅ Server running on port ${PORT}`);
 });
 
