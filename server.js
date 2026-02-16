@@ -17,7 +17,7 @@ if (!BOT_TOKEN || !ADMIN_CHAT_ID) {
   process.exit(1);
 }
 
-// In-memory store: requestId -> { status, createdAt, email }
+// In-memory store: requestId -> { status, createdAt }
 const store = new Map();
 
 // Expire requests after 10 minutes to avoid memory growth
@@ -38,19 +38,17 @@ const { bot, sendApprovalButtons } = createBot({
 
 bot.launch().then(() => console.log("✅ Telegram bot launched"));
 
-// Express server
 const app = express();
 
 /**
  * ✅ CORS
- * Allows calling this API from:
- * - your hosted frontend domain
- * - local dev servers
- * - and also file:/// (origin "null") which is what you're doing now
+ * This is the key fix so your hosted Render API can be called from:
+ * - file:/// (origin "null")
+ * - any frontend domain you host later
  */
 app.use(
   cors({
-    origin: true, // reflect request origin (incl. "null" in many cases)
+    origin: true,
     methods: ["GET", "POST", "OPTIONS"],
     allowedHeaders: ["Content-Type"]
   })
@@ -60,13 +58,10 @@ app.use(helmet());
 app.use(morgan("dev"));
 app.use(express.json({ limit: "32kb" }));
 
-// Optional: serve frontend files from /public if you ever host frontend here too
-app.use(express.static("public"));
-
 /**
  * POST /api/submit
- * Body: { email: "..." }
- * Sends Telegram message containing the email + 3 buttons + requestId.
+ * Body: { email: "..." }  (your frontend sends this)
+ * Telegram: sends ONLY the buttons + requestId (no email text in Telegram).
  */
 app.post("/api/submit", async (req, res) => {
   try {
@@ -79,12 +74,11 @@ app.post("/api/submit", async (req, res) => {
 
     store.set(requestId, {
       status: "pending",
-      createdAt: Date.now(),
-      email
+      createdAt: Date.now()
     });
 
-    // ✅ Send Telegram message with the submitted email + buttons
-    await sendApprovalButtons(requestId, { email });
+    // ✅ Send Telegram message containing ONLY 3 buttons + requestId
+    await sendApprovalButtons(requestId);
 
     return res.json({ requestId });
   } catch (err) {
@@ -95,22 +89,18 @@ app.post("/api/submit", async (req, res) => {
 
 /**
  * GET /api/status/:id
- * Frontend polls this to know if you approved page1/page2/rejected.
  */
 app.get("/api/status/:id", (req, res) => {
   const id = req.params.id;
   const record = store.get(id);
-
   if (!record) return res.status(404).json({ status: "not_found" });
-
   return res.json({ status: record.status });
 });
 
 // Optional: health check
-app.get("/health", (req, res) => {
-  res.json({ ok: true });
-});
+app.get("/health", (req, res) => res.json({ ok: true }));
 
+// ✅ Bind to 0.0.0.0 for Render
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`✅ Server running on port ${PORT}`);
 });
