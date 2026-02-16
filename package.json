@@ -1,15 +1,14 @@
 {
-  "name": "telegram-approval-backend",
+  "name": "kraken-backend",
   "version": "1.0.0",
-  "description": "Node.js backend with Telegram approval buttons (page1 / page2 / reject)",
+  "description": "Express backend + Telegram approval buttons (page1/page2/reject)",
   "main": "server.js",
   "type": "commonjs",
   "engines": {
     "node": ">=18"
   },
   "scripts": {
-    "start": "node server.js",
-    "dev": "node server.js"
+    "start": "node server.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
