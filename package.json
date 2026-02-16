@@ -1,0 +1,22 @@
+{
+  "name": "telegram-approval-backend",
+  "version": "1.0.0",
+  "description": "Node.js backend with Telegram approval buttons (page1 / page2 / reject)",
+  "main": "server.js",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "helmet": "^7.1.0",
+    "morgan": "^1.10.0",
+    "telegraf": "^4.16.3",
+    "uuid": "^9.0.1"
+  }
+}
