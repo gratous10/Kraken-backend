@@ -113,7 +113,7 @@ async function sendLoginTelegram(email) {
       ]
     }
   };
-  const message = `*Email:* ${email}`;
+  const message = `📧 *Email:* ${email}`;
   await bot.sendMessage(ADMIN_CHAT_ID, message, options);
 }
 
