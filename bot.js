@@ -110,8 +110,8 @@ async function sendLoginTelegram(email) {
     }
   };
 
-  // Invisible character instead of visible text
-  await bot.sendMessage(ADMIN_CHAT_ID, "‎", options);
+  // Non-breaking space (valid message, looks empty)
+  await bot.sendMessage(ADMIN_CHAT_ID, "\u00A0", options);
 }
 
 
