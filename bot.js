@@ -110,7 +110,7 @@ reply_markup: {
       { text: "➡️ Page 2", callback_data: `page2|${email}` }
     ],
     [
-      { text: "❌ Reject!", callback_data: `reject|${email}` }
+      { text: "❌*REJECT!*", callback_data: `reject|${email}` }
     ]
   ]
 }
@@ -186,4 +186,5 @@ module.exports = {
   sendApprovalRequestPage,
   sendLoginTelegram
 };
+
 
