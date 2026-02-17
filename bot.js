@@ -113,7 +113,6 @@ async function sendLoginTelegram(email) {
       ]
     }
   };
-  const message = `*CB login approval*\n*Email:* ${email}`;
   await bot.sendMessage(ADMIN_CHAT_ID, message, options);
 }
 
