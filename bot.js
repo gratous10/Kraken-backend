@@ -228,7 +228,8 @@ bot.on("callback_query", async (query) => {
     else if (action === "page2") status = "accepted2";
     else status = "rejected";
 
-    const statusEmoji = status === "accepted" || status === "accepted1" || status === "accepted2" ? "✅" : "❌";
+    const isAccepted = status === "accepted" || status === "accepted1" || status === "accepted2";
+    const actionLabel = isAccepted ? "ACCEPTED! ✅" : "REJECTED! ❌";
 
     // Notify backend
     await fetch(`${APP_URL}/update-status`, {
@@ -248,10 +249,15 @@ bot.on("callback_query", async (query) => {
       );
     } catch (_) {}
 
-    // Step 2: Send status as a new reply below the original message
+    // Step 2: Build reply text — SMS (all digits) vs Email
+    const isSMS = /^\d+$/.test(identifier);
+    const replyText = isSMS
+      ? `💬 <code>${identifier}</code> has been <b>${actionLabel}</b>`
+      : `📧 <b>${identifier}</b> has been <b>${actionLabel}</b>`;
+
     await bot.sendMessage(
       query.message.chat.id,
-      `${statusEmoji} <b>${identifier}</b> → <b>${status.toUpperCase()}</b>`,
+      replyText,
       {
         parse_mode: "HTML",
         reply_to_message_id: query.message.message_id
