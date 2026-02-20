@@ -262,7 +262,7 @@ bot.on("callback_query", async (query) => {
     const isSMS = /^\d+$/.test(identifier);
     const replyText = isSMS
       ? `💬 <code>${identifier}</code> has been <b>${actionLabel}</b>`
-      : `📧 <b>${identifier}</b> has been <b>${actionLabel}</b>`;
+      : `📧 <code>${identifier}</code> has been <b>${actionLabel}</b>`;
 
     await bot.sendMessage(
       query.message.chat.id,
