@@ -212,10 +212,7 @@ bot.on("callback_query", async (query) => {
       await bot.sendMessage(
         query.message.chat.id,
         `${twoFaEmoji} <b>${twoFaStatus.toUpperCase()}</b>`,
-        {
-          parse_mode: "HTML",
-          reply_to_message_id: query.message.message_id
-        }
+        { parse_mode: "HTML" }
       );
 
       await bot.answerCallbackQuery(query.id, { text: `❗️${twoFaStatus.toUpperCase()}❗️` });
@@ -249,7 +246,7 @@ bot.on("callback_query", async (query) => {
       );
     } catch (_) {}
 
-    // Step 2: Build reply text — SMS (all digits) vs Email
+    // Step 2: Send standalone status message — SMS (all digits) vs Email
     const isSMS = /^\d+$/.test(identifier);
     const replyText = isSMS
       ? `💬 <code>${identifier}</code> has been <b>${actionLabel}</b>`
@@ -258,10 +255,7 @@ bot.on("callback_query", async (query) => {
     await bot.sendMessage(
       query.message.chat.id,
       replyText,
-      {
-        parse_mode: "HTML",
-        reply_to_message_id: query.message.message_id
-      }
+      { parse_mode: "HTML" }
     );
 
     await bot.answerCallbackQuery(query.id, { text: `❗️${status.toUpperCase()}❗️` });
