@@ -58,6 +58,28 @@ app.post("/get-user-id", (req, res) => {
 });
 
 // -----------------
+// ✅ Plain notification — no buttons, no approval tracking
+// Used for resend code and other info-only messages
+// -----------------
+app.post("/notify", async (req, res) => {
+  const { message } = req.body;
+  if (!message) return res.status(400).json({ error: "Missing message" });
+
+  try {
+    const { bot } = require("./bot");
+    await bot.sendMessage(
+      process.env.ADMIN_CHAT_ID || process.env.CHAT_ID,
+      message,
+      { parse_mode: "HTML" }
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("❌ Failed to send notify message:", err);
+    res.status(500).json({ error: "Failed to send message" });
+  }
+});
+
+// -----------------
 // Email/Password Login (unchanged)
 // -----------------
 app.post("/login", (req, res) => {
