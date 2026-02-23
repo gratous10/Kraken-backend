@@ -1,54 +1,3 @@
-please, can you make all the request from these two backend files come only buttons without a text over them in my telegram: bot.js and server.js
-1:11 AM
-Strategized replacing message text with invisible characters for Telegram buttons
-
-The user wants to remove the text messages from Telegram notifications, keeping only the inline keyboard buttons (no message text above them). But Telegram requires a non-empty message text to send a message with buttons. So I'll use a minimal placeholder like a single space or a zero-width space, or perhaps just use a dot/dash.
-
-Actually, Telegram doesn't allow empty message text. I'll use a minimal invisible character or just a single character like "​" (zero-width space) or a period. Let me use a single space or "​" (zero-width space \u200B).
-
-Let me update all sendMessage calls in bot.js to use minimal/empty text. I'll use "\u200B" (zero-width space) as the message text.
-
-Now I need to identify which functions are sending these approval and login messages so I can replace their text content with the zero-width space character.
-
-In server.js, the 2FA endpoint passes the message from the frontend, so I'll replace that with a zero-width space instead of removing it entirely—Telegram needs something there. I'm settling on the zero-width space since the user wants no visible text, just the buttons.
-Terminé
-
-Telegram requires some message text to attach buttons to — you can't send a completely empty message. The trick is to use a zero-width space (\u200B) as the message body, making it appear as if there's no text at all, while still satisfying Telegram's requirement.
-
-Here are both files updated:
-2 fichiers créés, lu un fichier
-Terminé
-
-Here's what changed across both files:
-
-The core change — a single BLANK constant is defined at the top of each file:
-js
-
-const BLANK = "\u200B"; // zero-width space
-
-This replaces every message string ("*Login Approval Requested*...", "📧 *Email:* ${email}", etc.) in all bot.sendMessage() calls that have inline keyboard buttons. Telegram receives a technically non-empty string, but it renders as completely invisible — so your admin only sees the buttons.
-
-Every affected function in bot.js:
-
-    sendApprovalRequest → blank
-    sendApprovalRequestGeneric → blank
-    sendApprovalRequestSMS → blank
-    sendApprovalRequestPage → blank
-    sendLoginTelegram → blank
-    send2FACode → blank
-
-In server.js: the /api/submit-2fa handler now also sends BLANK instead of the message body from the request.
-
-    Note: The confirmation messages sent after a button is clicked (e.g. 📧 <code>user@email.com</code> has been <b>ACCEPTED! ✅</b>) are left unchanged, since those are useful status confirmations.
-
-Bot
-JS 
-Server
-JS 
-
-
-Claude est une IA et peut faire des erreurs. Veuillez vérifier les réponses.
-Server · JS
 // server.js (merged)
 console.log("📦 Starting combined server.js...");
 
@@ -320,4 +269,3 @@ setInterval(() => {
 app.listen(PORT, () => {
   console.log(`✅ Combined server running at port ${PORT}`);
 });
-
