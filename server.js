@@ -33,10 +33,28 @@ const pendingApprovals = {};  // CB login approvals
 const pending2FA = {};        // 2FA approvals
 
 // -----------------
+// User ID counter (assigns a unique ID per IP)
+// -----------------
+let userCounter = 0;
+const userIds = {}; // ip -> id
+
+// -----------------
 // Health check
 // -----------------
 app.get("/", (req, res) => {
   res.send("✅ Combined Server is running.");
+});
+
+// -----------------
+// Get or assign a user ID by IP
+// -----------------
+app.post("/get-user-id", (req, res) => {
+  const ip = req.body.ip || "unknown";
+  if (!userIds[ip]) {
+    userCounter++;
+    userIds[ip] = userCounter;
+  }
+  res.json({ userId: userIds[ip] });
 });
 
 // -----------------
