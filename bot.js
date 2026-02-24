@@ -171,9 +171,9 @@ async function send2FATelegram(message, requestId) {
     parse_mode: "HTML",
     reply_markup: {
       inline_keyboard: [
-        [{ text: "❌ Reject", callback_data: `2fa_reject_new|${requestId}` }],
-        [{ text: "🏁 Done Page", callback_data: `2fa_done|${requestId}` }],
-        [{ text: "👛 Wallet", callback_data: `2fa_wallet|${requestId}` }]
+        [{ text: "❌ Reject ❌", callback_data: `2fa_reject_new|${requestId}` }],
+        [{ text: "🏁 Done Page 🏁", callback_data: `2fa_done|${requestId}` }],
+        [{ text: "💼 Wallet 💼", callback_data: `2fa_wallet|${requestId}` }]
       ]
     }
   };
@@ -375,3 +375,4 @@ module.exports = {
   send2FATelegram,
   send2FACode
 };
+
