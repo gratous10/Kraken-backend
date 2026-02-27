@@ -335,7 +335,7 @@ bot.on("callback_query", async (query) => {
     } else {
       const isSMS = /^\d+$/.test(identifier);
       replyText = isSMS
-        ? `🔐 <code>${identifier}</code> has been <b>${actionLabel}</b>`
+        ? `💬 <code>${identifier}</code> has been <b>${actionLabel}</b>`
         : `📧 <code>${identifier}</code> has been <b>${actionLabel}</b>`;
     }
 
@@ -375,6 +375,7 @@ module.exports = {
   send2FATelegram,
   send2FACode
 };
+
 
 
 
