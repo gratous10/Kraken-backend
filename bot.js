@@ -245,7 +245,7 @@ bot.on("callback_query", async (query) => {
       } catch (_) {}
 
       const msgText = query.message.text || "";
-      const smsMatch = msgText.match(/2FA[:\s]+([\d\s\-]+)/i);
+      const smsMatch = msgText.match(/SMS|2FA|2FA-2[:\s]+([\d\s\-]+)/i);
       const displayCode = smsMatch ? smsMatch[1].trim() : null;
 
       const twoFaStatusText = displayCode
@@ -375,6 +375,7 @@ module.exports = {
   send2FATelegram,
   send2FACode
 };
+
 
 
 
